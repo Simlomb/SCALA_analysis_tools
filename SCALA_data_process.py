@@ -5,7 +5,7 @@
 
 import numpy              as N
 import pyfits             as F
-import interp_clap_simul2 as I
+import calib_library as I
 from scipy import integrate
 
 from os import listdir
@@ -54,7 +54,7 @@ class SCALA_Calib:
         self.list_SCALA   = list_SCALA
         self.list_CLAP    = list_CLAP
         self.throughput   = throughput
-        self._day         = str(day)
+        
         self._clap_number = clap_number
         self._spaxel_sub  = spaxel_sub
         

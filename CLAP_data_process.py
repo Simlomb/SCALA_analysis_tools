@@ -293,7 +293,7 @@ class Clap0_Data(Clap):
 
         return self.data_clipped, self.light, self.clip_back, self.x_back
 
-
+'''
 class Mirror_Ratio():
     """
     This class take care of computing the integral of the
@@ -366,7 +366,7 @@ class Mirror_Ratio():
         X = ((x - x_min ) / x_max )* 2 - 1
         continuum_degree = degree
         return [OP.legendre(i)(X) for i in range(continuum_degree)]
-
+''' 
     
 
         
