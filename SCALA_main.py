@@ -5,7 +5,7 @@
 
 
 import optparse
-import SCALA_data_process  as SC
+import SCALA_data_process as SC
 
 ##########################################################################
 ###############################  MAIN  ###################################
