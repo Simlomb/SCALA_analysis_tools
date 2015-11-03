@@ -3,7 +3,7 @@
 # - 2015
 # -*- coding: utf-8 -*-
 
-
+import numpy              as N
 import optparse
 import SCALA_data_process as SC
 
@@ -28,12 +28,13 @@ if __name__ == '__main__':
                       
     
     opts,args = parser.parse_args()
-
+    s_list = sorted([str(item) for item in opts.scala_list.split(',')])
+    c_list = sorted([str(item) for item in opts.clap_list.split(',')])
     
-    scala = SC.SCALA_Calib(opts.scala_list, opts.clap_list, opts.throughput)
+    scala = SC.SCALA_Calib(s_list, c_list, opts.throughput)
     all_wave     = N.sum([len(scala.clap_data[k].lbda) for k in range(len(scala.clap_data))])
-    matrix_cal_B = N.zeros((all_wave,all_wave,15,15))
-    matrix_cal_R = N.zeros((all_wave,all_wave,15,15)) 
+    matrix_cal_B = N.zeros((2,all_wave,15,15))
+    matrix_cal_R = N.zeros((2,all_wave,15,15)) 
     for i in range(15):
             
         for j in range(15):
@@ -44,14 +45,16 @@ if __name__ == '__main__':
                 calib_file_B,calib_file_R = [],[]
                 scala.Clap_info_and_light_level(k)
                 for d in range(dimension):
-                    calib_file_B = N.append(calib_B,scala.channel_analysis(k, 'B', d, i,j))
-                    calib_file_R = N.append(calib_R, scala.channel_analysis(k, 'R', d, i,j))
+                    calib_file_B = N.append(calib_file_B,scala.channel_analysis(k, 'B', d, i,j))
+                    calib_file_R = N.append(calib_file_R, scala.channel_analysis(k, 'R', d, i,j))
                     lbda_B       = N.append(lbda_B, scala.lbdacent_snifs)
                     lbda_R       = N.append(lbda_R, scala.lbdacent_snifs)
                 calib_sp_B = N.append(calib_sp_B, calib_file_B)
                 calib_sp_R = N.append(calib_sp_R, calib_file_R)
                 
             index_sortedB         = N.argsort(lbda_B)
-            index_sortedR         = N.argsort(lmbd_R)
+            index_sortedR         = N.argsort(lbda_R)
             matrix_cal_B[:,:,i,j] = N.array((lbda_B[index_sortedB],calib_sp_B[index_sortedB]))
             matrix_cal_R[:,:,i,j] = N.array((lbda_R[index_sortedR],calib_sp_R[index_sortedR]))
+	print "DONE!!!"
+

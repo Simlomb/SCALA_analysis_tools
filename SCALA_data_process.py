@@ -51,36 +51,40 @@ class SCALA_Calib:
     def __init__(self,list_SCALA, list_CLAP, throughput=True, clap_number=1,spaxel_sub=0):
         """
         """
-        self.list_SCALA   = list_SCALA
-        self.list_CLAP    = list_CLAP
+        self.list_SCALA   = sorted(list_SCALA)
+        self.list_CLAP    = sorted(list_CLAP)
         self.throughput   = throughput
-        
+	        
         self._clap_number = clap_number
         self._spaxel_sub  = spaxel_sub
         
         self.clap_files0  = self.list_CLAP[:len(self.list_CLAP)/2]
-        self.clap_files1  = self.list_CLAP[self.list_CLAP/2:]
+        self.clap_files1  = self.list_CLAP[len(self.list_CLAP)/2:]
         if self._clap_number == 0:
             self._clap_files = self.clap_files0
         else:
-            self._clap_files = self.clap_files1
-        
-       
+            self._clap_files = self.clap_files1       
+	       
         self.scala_B_channel, self.scala_R_channel =[],[]
         for s in self.list_SCALA :
-            if s.split(".")[0][15]== '4':
+            if s.split(".")[0][-1] == 'B':
                 self.scala_B_channel = N.append(self.scala_B_channel, s)
             else:
                 self.scala_R_channel = N.append(self.scala_R_channel, s)
         self.Inter1      = self.interp_profile(1)
+        self.snifs_data_B, self.snifs_data_R, self.clap_data, self.integrated_clap = [],[],[],[]
+        print "First I load clap and snifs data and I fit all the CLap data"
         for i in range(len(self._clap_files)):
-            self.snifs_data_B.append(SnifsData(self.new_dir_S+self.scala_B_channel[i]))
-            self.snifs_data_R.append(SnifsData(self.new_dir_S+self.scala_R_channel[i]))
+            self.snifs_data_B.append(SnifsData(self.scala_B_channel[i]))
+            self.snifs_data_R.append(SnifsData(self.scala_R_channel[i]))
             if clap_number == 0:
                 print "WARNING the next step will not work because you are not using the class Clap0_Data for clap 0"
                 break
             else:
-                self.clap_data.append(Cdp.Clap1_Data(self.new_dir_C+self._clap_files[i]))
+                self.clap_data.append(Cdp.Clap1_Data(self._clap_files[i]))
+                self.clap_data[i].sig_back()
+                self.integrated_clap.append(self.clap_data[i].light)
+        print "Clap data fitting performed. Now I compute the throughput for each spaxel"
         self.A18         = I.Simulate(None).interpolate_mirror
         self.clap1_simul = I.Simulate(1).interpolate_array
 
@@ -149,8 +153,8 @@ class SCALA_Calib:
         OUTPUT: every object created from the class CLAP and the method
                 sig_back
         """
-        self.Clap       = self.clap_data[file]
-        self.Clap.sig_back()
+        self.Clap       = self.clap_data[file_number]
+        #self.Clap.sig_back()
 
 
 
@@ -225,7 +229,7 @@ class SCALA_Calib:
             index_snifs = N.argmax(self.snifs_data.data[:index+delta,spxx,spxy])
             return 0, index_snifs+linewidth, index_snifs
         elif line == 0:
-                index_snifs = N.argmax(self.snifs_data.data[:index+delta,spxx,psxy])
+                index_snifs = N.argmax(self.snifs_data.data[:index+delta,spxx,spxy])
                 if index_snifs < linewidth:
                     return 0, index_snifs+linewidth, index_snifs
                 else:
@@ -274,8 +278,8 @@ class SCALA_Calib:
         Compute the result of the analysis combining the light measured by CLAP
         with that measured by SNIFS and the related error
         INPUT:
-               snifs_light: light level for one wavelength measured by SNIFS [erg/A/s/cmˆ2/spaxel]
-               clap_light : light level measured by CLAP [W]
+               snifs_light: light level for one wavelength measured by SNIFS #[erg/A/s/cm**2/spaxel]
+               clap_light : light level measured by CLAP #[W]
                geom_factor: converting factor for different dimension between
                             CLAP, SNIFS and the SCALA beam
         OUTPUT:
@@ -305,7 +309,7 @@ class SCALA_Calib:
                file_number: index of file used for analysis
                
         """
-        if channel == 'B'
+        if channel == 'B':
             self.snifs_data = self.snifs_data_B[file_number]
         else:
             self.snifs_data = self.snifs_data_R[file_number]
@@ -323,12 +327,13 @@ class SCALA_Calib:
         else:
             self.empty_line = False
             start, end, index_snifs = self.select_condition_for_line_analysis(channel,line,len(self.Clap.lbda),index,delta,linewidth,spxx,spxy)
-            snifs_line              = self.select_SNIFS_data_single_line(star,end,spxx,spxy)
+            snifs_line              = self.select_SNIFS_data_single_line(start,end,spxx,spxy)
             self.lbdacent_snifs     = self.snifs_data.lbda[index_snifs]
             mean_bkg                = self._background_(delta,index_snifs,spxx,spxy,line)
             self.line_bkg_sub       = snifs_line[1] - mean_bkg
             self.line_bkg_sub[N.isnan(self.line_bkg_sub)] = 0.
-            snifs_line[2,N.isnan(snifs_line[2])] = 0.
+            variance_Snifs          = snifs_line[2]
+            variance_Snifs[N.isnan(variance_Snifs)] = 0.
             
         if self.empty_line:
             self.line_int     = 0.
@@ -336,9 +341,9 @@ class SCALA_Calib:
             return 0., lbdacent_clap, 0.
         else:
             weight_func = self.weight_CLAP_Data(self.lbdacent_snifs)
-            clap_light  = self.Clap.light[line][0]*weight_func
+            clap_light  = self.integrated_clap[file_number][line][0]*weight_func
             geom_factor = self.convert_factor(self.lbdacent_snifs)
-            snifs_light = self.integ_snifs_line(self.line_bkg_sub,snifs_line[0], snifs_line[2])
+            snifs_light,err_snifs = self.integ_snifs_line(self.line_bkg_sub,snifs_line[0], variance_Snifs)
             Calibration = self.analysis_result(snifs_light,clap_light,geom_factor)
 
         return Calibration

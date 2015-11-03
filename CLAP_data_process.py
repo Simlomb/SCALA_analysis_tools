@@ -132,7 +132,7 @@ class Clap1_Data(Clap):
     """
             
     
-    def sig_back(self):
+    def sig_back(self, no_out=True):
         """
         Compute the signal and background level of CLAP1 data
         and also compute the overall amount of light produced by SCALA in
@@ -222,8 +222,10 @@ class Clap1_Data(Clap):
 
         self.light = N.delete(self.light,0,0)
         self.mask_list.remove(1.)
-
-        return self.data_clipped, self.x_data_clipped,self.light, self.mask_list, self.clip_back,self.x_back
+        if no_out:
+           """return nothing"""
+        else:
+            return self.data_clipped, self.x_data_clipped,self.light, self.mask_list, self.clip_back,self.x_back
      
 
 class Clap0_Data(Clap):
