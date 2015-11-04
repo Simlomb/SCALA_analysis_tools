@@ -6,6 +6,7 @@
 import numpy              as N
 import optparse
 import SCALA_data_process as SC
+import pickle             as pk
 
 ##########################################################################
 ###############################  MAIN  ###################################
@@ -56,5 +57,10 @@ if __name__ == '__main__':
             index_sortedR         = N.argsort(lbda_R)
             matrix_cal_B[:,:,i,j] = N.array((lbda_B[index_sortedB],calib_sp_B[index_sortedB]))
             matrix_cal_R[:,:,i,j] = N.array((lbda_R[index_sortedR],calib_sp_R[index_sortedR]))
-	print "DONE!!!"
+	#print "DONE!!!"
+name = c_list[0][4:14]
+with open('%s_B.pickle' %name, 'wb') as transmiss_B:
+    pk.dump(matrix_cal_B, transmiss_B)
 
+with open('%s_R.pickle' %name, 'wb') as transmiss_R:
+    pk.dump(matrix_cal_R, transmiss_R)
