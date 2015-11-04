@@ -207,6 +207,9 @@ class Clap1_Data(Clap):
             
             if -(raw_mean_clip-N.mean(reclip_back[-1000:])) <= 5.:
                 print "shutter issue at wave %d, Please check file '%s'" %(self.lbda[i],self.clap_file)
+                integral_result = N.array((0.,0.))
+                self.light = N.vstack((self.light, integral_result))
+                self.mask_list.append(mask)
             else:
                 # the amplitude of the signal (parameter a in the fit)
                 self.data_clipped  = N.append(self.data_clipped,-(raw_mean_clip - clip_back_mean))
@@ -215,10 +218,10 @@ class Clap1_Data(Clap):
                 #data_error         = N.sqrt(raw_error**2 + ((N.std(clip_back1)/N.sqrt(len(clip_back1)-1.))**2+(N.std(clip_back2)/N.sqrt(len(clip_back2)-1.))**2)/4.)
                 #self.data_error    = N.append(self.data_error, data_error)
 
-            integral_result = self.data_integral(x_array,data_new,self.data_clipped[i],self.sub_exp[i],x_array_sig[-mask_rem_cosm][0],clip_back_mean)
-            # the integral of the total amount of light produced by SCALA
-            self.light = N.vstack((self.light, integral_result))
-            self.mask_list.append(mask)
+                integral_result = self.data_integral(x_array,data_new,self.data_clipped[i],self.sub_exp[i],x_array_sig[-mask_rem_cosm][0],clip_back_mean)
+                # the integral of the total amount of light produced by SCALA
+                self.light = N.vstack((self.light, integral_result))
+                self.mask_list.append(mask)
 
         self.light = N.delete(self.light,0,0)
         self.mask_list.remove(1.)
