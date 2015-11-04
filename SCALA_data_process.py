@@ -245,19 +245,35 @@ class SCALA_Calib:
         the simpson method (IS IT OK TO USE IT??) and the related
         error
         INPUT:
-               obs_line: data of the line observed by SNIFS
+               obs_line: array data of the line observed by SNIFS
                          after they have been background subtsracted
                          the data must be in unit of energy (erg)
-               lbda    : wavelengths belonging to the line
+               lbda    : array wavelengths belonging to the line
                variance: variance of the data
         OUTPUT:
                int_profile: line profile integrated
                snifs_err  : err due to the integration
         
         """
-        int_profile = integrate.simps(N.asarray(obs_line),lbda)
+        if self.throughput:
+            line_profile = N.asarray(obs_line)*self.photon_energy(lbda)
+        else:
+            line_profile =  N.asarray(obs_line)
+        int_profile = integrate.simps(line_profile,lbda)
         snifs_err   = (self.snifs_data.L_step*self.snifs_data.L_step)*(variance[0]+4*N.sum(variance[2:-2:2])+16*N.sum(variance[1::2])+(variance[-1]))/(9*int_profile*int_profile)
         return int_profile, snifs_err
+    
+    def photon_energy(self, lbda):
+        """
+        Compute the enrgy of photons
+        INPUT :
+               lbda : array of wavelengths for the photons
+        OUTPUT:
+               E : array of energy of photons
+        """
+        E =  (SC.h*SC.c)*10**(10)/lbda #photon energy
+        return N.array(E)
+        
     
     def convert_factor(self,lbda_cent):
         """
@@ -293,6 +309,7 @@ class SCALA_Calib:
         """
         if self.throughput:
             Calib_value = snifs_light*geom_factor*43.5/clap_light
+            #print snifs_light, clap_light
             #Tot_error   = N.sqrt(Clap_error +integ_clap_err+A18_error+snifs_err)*Calib_value
             ###Compute the error!!!!!
         else:
@@ -318,6 +335,7 @@ class SCALA_Calib:
         index         = int((lbdacent_clap-self.snifs_data.L_start)/self.snifs_data.L_step)
         delta         = int((self.Clap.lbda[2]-self.Clap.lbda[1])/(2*self.snifs_data.L_step))
         linewidth     = int(42./self.snifs_data.L_step)
+        #print file_number, channel,line, spxx, spxy,lbdacent_clap
         #considering that we have datacubes for all the data in B and R
         #we need to distinguish between the ones with data or without
         if lbdacent_clap > self.snifs_data.lbda[-1-5] or lbdacent_clap < (self.snifs_data.L_start-4.):
@@ -338,12 +356,15 @@ class SCALA_Calib:
         if self.empty_line:
             self.line_int     = 0.
             self.line_profile = 0.
-            return 0., lbdacent_clap, 0.
+            Calibration = 0.
         else:
             weight_func = self.weight_CLAP_Data(self.lbdacent_snifs)
             clap_light  = self.integrated_clap[file_number][line][0]*weight_func
-            geom_factor = self.convert_factor(self.lbdacent_snifs)
-            snifs_light,err_snifs = self.integ_snifs_line(self.line_bkg_sub,snifs_line[0], variance_Snifs)
-            Calibration = self.analysis_result(snifs_light,clap_light,geom_factor)
+            if clap_light == 0.:
+                Calibration = 0.
+            else:
+                geom_factor = self.convert_factor(self.lbdacent_snifs)
+                snifs_light,err_snifs = self.integ_snifs_line(self.line_bkg_sub,snifs_line[0], variance_Snifs)
+                Calibration = self.analysis_result(snifs_light,clap_light,geom_factor)
 
         return Calibration
