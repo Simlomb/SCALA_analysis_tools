@@ -26,7 +26,7 @@ class Clap:
         self._Fits      = F.open(clap_file)
         self._Primary   = self._Fits[0]
         self._Tables    = self._Fits[1]
-        
+        self.clap_file  = clap_file
         self.lbda       = self._Tables.data["LBDA"][:]
         self.expotime   = self._Tables.data["EXPTIME"][:]
         self.time_start = self._Tables.data["TIMESTAR"][:]
@@ -206,7 +206,7 @@ class Clap1_Data(Clap):
             self.x_data_clipped    = N.append(self.x_data_clipped,(-self.time_start[i]+self.time_stop[i])/2. + self.time_start[i])
             
             if -(raw_mean_clip-N.mean(reclip_back[-1000:])) <= 5.:
-                print "shutter issue at wave %d, Please check file '%s'" %(self.lbda[i], clap_file)
+                print "shutter issue at wave %d, Please check file '%s'" %(self.lbda[i],self.clap_file)
             else:
                 # the amplitude of the signal (parameter a in the fit)
                 self.data_clipped  = N.append(self.data_clipped,-(raw_mean_clip - clip_back_mean))
