@@ -1,4 +1,6 @@
 import numpy                         as N
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot             as P
 import pickle                        as pk
 import optparse
@@ -26,8 +28,8 @@ if __name__ == '__main__':
     fig = P.figure()
     ax = fig.add_subplot(111)
     ax.plot(lbd, transm, '-ob', label='transmissivity_%s' %str(opts.file)[-8])
-    ax.set_legend(loc='best', fancybox=True)
+    ax.legend(loc='best', fancybox=True)
     ax.set_xlabel("Wavelength ($\AA$)")
     ax.set_ylabel("Transmissivity")
-    ax.savefig('transmissivity_%s.png' %str(opts.file)[:-7], dpi=300)
+    fig.savefig('transmissivity_%s.png' %str(opts.file)[:-7], dpi=300)
     
