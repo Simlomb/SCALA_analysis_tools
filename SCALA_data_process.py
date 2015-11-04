@@ -58,8 +58,8 @@ class SCALA_Calib:
         self._clap_number = clap_number
         self._spaxel_sub  = spaxel_sub
         
-        self.clap_files0  = self.list_CLAP[:len(self.list_CLAP)/2]
-        self.clap_files1  = self.list_CLAP[len(self.list_CLAP)/2:]
+        self.clap_files0  = [i for i in self.list_CLAP if i[2] == '0']
+        self.clap_files1  = [i for i in self.list_CLAP if i[2] == '1']
         if self._clap_number == 0:
             self._clap_files = self.clap_files0
         else:
