@@ -96,7 +96,7 @@ class SCALA_Calib:
         for one of the arm the arm_number indicate wich one
         """
         if arm_number == 1:
-            arm = N.loadtxt('/Users/simonalombardo/new_backup/SCALA_transmiss/arms/new/arm4.txt')
+            arm = N.loadtxt('arm4.txt')
         return interpolate.interp1d(arm[:,0],arm[:,1], kind='cubic')
 
 
