@@ -1,6 +1,7 @@
 import numpy                         as N
 import matplotlib.pyplot             as P
 import pickle                        as pk
+import optparse
 
 if __name__ == '__main__':
     parser = optparse.OptionParser()
@@ -10,6 +11,8 @@ if __name__ == '__main__':
     opts,args = parser.parse_args()
     with open(str(opts.file), 'rb') as transm_info:
         transmittivity = pk.load(transm_info)
+    new_trans = N.zeros((len(transmittivity[0,:,0,0]),15,15))
+    new_lambd = N.zeros((len(transmittivity[0,:,0,0]),15,15))
     for i in range(15):
         for j in range(15):
             new_trans[:,i,j] = transmittivity[1,:,i,j]
