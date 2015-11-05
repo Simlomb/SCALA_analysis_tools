@@ -31,6 +31,13 @@ if __name__ == '__main__':
     opts,args = parser.parse_args()
     s_list = sorted([str(item) for item in opts.scala_list.split(',')])
     c_list = sorted([str(item) for item in opts.clap_list.split(',')])
+    if len(s_list) != len(c_list):
+        for i in range(len(s_list)/2):
+            while (s_list[i*2][-13:-10]) != (c_list[i][-8:-5]):
+                print ("WARNING one SCALA file is missing for blue and red!! The corresponding CLAP data would be %s and it will be removed by the analysis!" %c_list[i])
+                del c_list[i]
+                del c_list[i+(len(c_list)/2)]
+                
     
     scala = SC.SCALA_Calib(s_list, c_list, opts.throughput)
     all_wave     = N.sum([len(scala.clap_data[k].lbda) for k in range(len(scala.clap_data))])

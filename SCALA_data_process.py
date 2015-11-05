@@ -179,7 +179,7 @@ class SCALA_Calib:
         integ_weight = integrate.simps(arm1_int*clap1_int, lbd_weight+lbda_cent)
         weight_funct = integrate.simps(arm1_int, lbd_weight+lbda_cent)/integ_weight
         # We have to compute the error on that!!!
-        return weight_funct
+        return (weight_funct/43.5)
 
 
     def select_SNIFS_data_single_line(self, start, end, spxx, spxy):
@@ -285,8 +285,8 @@ class SCALA_Calib:
                 of CLAP, SNIFS, and the SCALA beam:
                 I HAVE TO WRITE IT DOWN HERE!!!!!
         """
-        A18_value = N.mean([f(lbda_cent) for f in self.A18])
-        return 68138.340344872/A18_value
+        A18_value = N.mean([f(lbda_cent) for f in self.A18]) #Check the A18 value scaling factor!!!!
+        return 93549.95727539062/A18_value
 
     
     def analysis_result(self,snifs_light,clap_light,geom_factor):
@@ -308,12 +308,12 @@ class SCALA_Calib:
                 Tot_error : is the Calib_value error 
         """
         if self.throughput:
-            Calib_value = snifs_light*geom_factor*43.5/clap_light
+            Calib_value = snifs_light*geom_factor/clap_light
             #print snifs_light, clap_light
             #Tot_error   = N.sqrt(Clap_error +integ_clap_err+A18_error+snifs_err)*Calib_value
             ###Compute the error!!!!!
         else:
-            Calib_value = snifs_light*geom_factor*((0.58**2)*(10**-7)*43.5/clap_light)*(self.snifs_data.exptime)
+            Calib_value = snifs_light*geom_factor*((0.58**2)*(10**-7)/clap_light)*(self.snifs_data.exptime)
             #Tot_error   = N.sqrt(Clap_error +integ_clap_err+A18_error+snifs_err)*Calib_value
 
         return Calib_value#, Tot_error

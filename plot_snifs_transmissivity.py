@@ -1,6 +1,4 @@
 import numpy                         as N
-import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot             as P
 import pickle                        as pk
 import optparse
@@ -21,15 +19,13 @@ if __name__ == '__main__':
             new_lambd[:,i,j] = transmittivity[0,:,i,j]
 
 
-    transm = N.mean(new_trans, axis=1)
-    transm = N.mean(transm, axis=1)
+    transm = N.sum(new_trans, axis=1)
+    transm = N.sum(transm, axis=1)/225.
     lbd = N.mean(new_lambd, axis=1)
     lbd = N.mean(lbd, axis=1)
-    fig = P.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(lbd, transm, '-ob', label='transmissivity_%s' %str(opts.file)[-8])
-    ax.legend(loc='best', fancybox=True)
-    ax.set_xlabel("Wavelength ($\AA$)")
-    ax.set_ylabel("Transmissivity")
-    fig.savefig('transmissivity_%s.png' %str(opts.file)[:-7], dpi=300)
+    P.plot(lbd, transm, '-ob', label='transmissivity_%s' %str(opts.file)[-8])
+    P.legend(loc='best', fancybox=True)
+    P.xlabel("Wavelength ($\AA$)")
+    P.ylabel("Transmissivity")
+    P.savefig('transmissivity_%s.png' %str(opts.file)[:-7], dpi=300)
     
