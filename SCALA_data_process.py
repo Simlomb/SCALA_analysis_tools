@@ -112,7 +112,7 @@ class SCALA_Calib:
         return Arr_C[-FlagNaN]
 
 
-    def _background_(self, delta, lbdacent, spxx, spxy,line):
+    def _background_(self, delta, lbdacent, spxx, spxy,line,linewidth):
         """
         Compute the background taking the mean value of an interval between two lines
         observed in SNIFS.
@@ -125,17 +125,13 @@ class SCALA_Calib:
                line    : wavelength number observed (usually they are in tot
                          4 for B and 10 for R)
         """
-        bkg_step       = int(100/self.snifs_data.L_step)
-        first_bkg      = lbdacent-delta
-        second_bkg     = lbdacent+delta
-        if line == 0:
-            mean_bkg  = N.mean(self.Clean_array(self.snifs_data.data[second_bkg-bkg_step:second_bkg+bkg_step,spxx,spxy]))
-            
-        else:
-            mean_first     = N.mean(self.Clean_array(self.snifs_data.data[first_bkg-bkg_step:first_bkg+bkg_step, spxx,spxy]))
-            mean_second    = N.mean(self.Clean_array(self.snifs_data.data[second_bkg-bkg_step:second_bkg+bkg_step,spxx,spxy]))
-            mean_bkg       = (mean_first+mean_second)/2.
-            
+        first_bkg      = lbdacent-delta[0]
+        second_bkg     = lbdacent+delta[1]
+        bkg_step1 = delta[0]-linewidth-5
+        bkg_step2 = delta[1]-linewidth-5
+        background = self.Clean_array(self.snifs_data.data[first_bkg-bkg_step1:first_bkg+bkg_step1, spxx,spxy])
+        background = N.append(background,self.Clean_array(self.snifs_data.data[second_bkg-bkg_step2:second_bkg+bkg_step2,spxx,spxy]))
+        mean_bkg = N.mean(background)
         return mean_bkg
 
 
@@ -204,7 +200,23 @@ class SCALA_Calib:
         variance      = self.snifs_data.variance[start:end, spxx, spxy]
         return lbda_line, line_profile, variance
         
- 
+    def find_delta(self,line,len_Cl_data,spxx, spxy):
+        """
+        """
+       
+        if line == 0:
+            delta1 = (self.Clap.lbda[line]-self.snifs_data.lbda[2])/(2*self.snifs_data.L_step)
+            delta2 = (self.Clap.lbda[line+1]-self.Clap.lbda[line])/(2*self.snifs_data.L_step)
+        elif line == len_Cl_data-1: 
+            delta1 = (self.Clap.lbda[line]-self.Clap.lbda[line-1])/(2*self.snifs_data.L_step)
+            delta2 = (self.snifs_data.lbda[-3]-self.Clap.lbda[line])/(2*self.snifs_data.L_step)
+        else:
+            delta1 = (self.Clap.lbda[line]-self.Clap.lbda[line-1])/(2*self.snifs_data.L_step)
+            delta2 = (self.Clap.lbda[line+1]-self.Clap.lbda[line])/(2*self.snifs_data.L_step)
+        return int(delta1), int(delta2)
+
+
+        
     def select_condition_for_line_analysis(self,channel,line,len_Cl_data,index,delta,linewidth,spxx,spxy):
         """
         Select the first and last wavelength to cut the SNIFS data to examine a
@@ -226,16 +238,17 @@ class SCALA_Calib:
               by SNIFS, and index of the element which correspond to the end (start,end)
         """
         if channel == 'R' and len_Cl_data == 4:
-            index_snifs = N.argmax(self.snifs_data.data[:index+delta,spxx,spxy])
+            index_snifs = N.argmax(self.snifs_data.data[:index+delta[1],spxx,spxy])
             return 0, index_snifs+linewidth, index_snifs
         elif line == 0:
-                index_snifs = N.argmax(self.snifs_data.data[:index+delta,spxx,spxy])
+                index_snifs = N.argmax(self.snifs_data.data[:index+delta[1],spxx,spxy])
                 if index_snifs < linewidth:
                     return 0, index_snifs+linewidth, index_snifs
                 else:
                     return index_snifs-linewidth,index_snifs+linewidth, index_snifs
         else:
-            index_snifs = N.argmax(self.snifs_data.data[index-delta:index+delta,spxx,spxy])+index-delta
+            #print self.snifs_data.data[index-delta[0],spxx,spxy], self.snifs_data.data[index+delta[1],spxx,spxy ],index, delta[0], delta[1]
+            index_snifs = N.argmax(self.snifs_data.data[index-delta[0]:index+delta[1],spxx,spxy])+index-delta[0]
             return index_snifs-linewidth,index_snifs+linewidth, index_snifs
 
 
@@ -330,11 +343,11 @@ class SCALA_Calib:
             self.snifs_data = self.snifs_data_B[file_number]
         else:
             self.snifs_data = self.snifs_data_R[file_number]
-
+        #print channel, file_number,line
         lbdacent_clap = self.Clap.lbda[line]
         index         = int((lbdacent_clap-self.snifs_data.L_start)/self.snifs_data.L_step)
-        delta         = int((self.Clap.lbda[2]-self.Clap.lbda[1])/(2*self.snifs_data.L_step))
-        linewidth     = int(42./self.snifs_data.L_step)
+        delta         = self.find_delta(line,len(self.Clap.lbda), spxx,spxy)
+        linewidth     = int(70./self.snifs_data.L_step)
         #print file_number, channel,line, spxx, spxy,lbdacent_clap
         #considering that we have datacubes for all the data in B and R
         #we need to distinguish between the ones with data or without
@@ -347,7 +360,7 @@ class SCALA_Calib:
             start, end, index_snifs = self.select_condition_for_line_analysis(channel,line,len(self.Clap.lbda),index,delta,linewidth,spxx,spxy)
             snifs_line              = self.select_SNIFS_data_single_line(start,end,spxx,spxy)
             self.lbdacent_snifs     = self.snifs_data.lbda[index_snifs]
-            mean_bkg                = self._background_(delta,index_snifs,spxx,spxy,line)
+            mean_bkg                = self._background_(delta,index_snifs,spxx,spxy,line,linewidth)
             self.line_bkg_sub       = snifs_line[1] - mean_bkg
             self.line_bkg_sub[N.isnan(self.line_bkg_sub)] = 0.
             variance_Snifs          = snifs_line[2]
