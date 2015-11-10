@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       09-11-2015 15:08:14
+## Modified at:       10-11-2015 15:57:01
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -308,6 +308,7 @@ if __name__ == "__main__":
     os.system("cp %s/SCALA_analysis_tools/*.txt .")
     os.system(cmd)
 
+    """
     # troughput comparison
     # here we have to use the flux calibrated scala cube
     # so we need to update the code to get the 065-000 Reduced SCALA cube,
@@ -323,5 +324,5 @@ if __name__ == "__main__":
     print cmd
     os.system("cp %s/SCALA_analysis_tools/*.txt .")
     os.system(cmd)
-
+    """
 # End of plan_scala.py
