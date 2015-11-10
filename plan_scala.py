@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       10-11-2015 15:57:01
+## Modified at:       10-11-2015 16:40:43
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     cmd += "-s %s -c %s" % (",".join(glob.glob('3d_U*.fits')),
                             ",".join(glob.glob('SC*.fits')))
     print cmd
-    os.system("cp %s/SCALA_analysis_tools/*.txt .")
+    os.system("cp %s/SCALA_analysis_tools/*.txt ." % path)
     os.system(cmd)
 
     """
