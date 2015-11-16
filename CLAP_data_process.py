@@ -277,7 +277,8 @@ class Clap0_Data(Clap):
             # and end up in the signal by mistake, the time separation must be smaller then 0.010 s
             x_array_sig   = x_array[-mask[i]]
             mask_rem_cosm = x_array_sig<=0.010
-            data_new_sig  = data_new[-mask]
+            data_new_sig  = data_new[-mask[i]]
+            x_b            =  x_array[mask[i]]
             self.sub_exp       = N.append(self.sub_exp,  x_array_sig[-mask_rem_cosm][-1] -  x_array[-mask_rem_cosm][0])
             # first we have to compute the background level as before
             clip_back          = data_new[mask[i]]
