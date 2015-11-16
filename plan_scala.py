@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       10-11-2015 16:40:43
+## Modified at:       16-11-2015 10:59:22
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -236,42 +236,6 @@ def get_calib_files(year=15, day=159, channel=2):
                                 Channel=channel, Version=202)
     return tc, ex, fs
 
-
-
-"""
-def test_flux_calibration():
-    #- Feige110 INFO -- 14_244_064_003 (photometric) ==========
-    #- Feige110 INFO -- Multi-std extinction 1424403500326256000202000
-    cp -v /sps/snovae/SRBregister/Prod/02-02/14/244/14_244_035_003_2_625_600_02-02_000.fits extP_14_244.fits
-    #- Feige110 INFO -- Multi-std telluric correction 1424403500326206000202000
-    cp -v /sps/snovae/SRBregister/Prod/02-02/14/244/14_244_035_003_2_620_600_02-02_000.fits tell_14_244.fits
-    #- Feige110 INFO -- Multi-std flux solution 1424403500326306000202000
-    cp -v /sps/snovae/SRBregister/Prod/02-02/14/244/14_244_035_003_2_630_600_02-02_000.fits fxSolP_14_244_R.fits
-    ##- Feige110 INFO -- Cube 1424406400320220000201000
-    #cp -v /sps/snovae/SRBregister/Prod/02-01/14/244/14_244_064_003_2_022_003_02-01_000.tig TCP14_244_064_003_17_R.tig
-    #cp -v /sps/snovae/SRBregister/Prod/02-01/14/244/14_244_064_003_2_022_001_02-01_000.fits CP14_244_064_003_17_R.fits
-    #truncate_cube -in TCP14_244_064_003_17_R.tig -out TTCP14_244_064_003_17_R.tig -wave 5100,9700 -quiet -noask
-
-
-    
-    scala_cube = Process.objects.get(Fclass=65,
-                                     IdProcess__startswith='151590370034')
-    cube = scala_bube.File_FK.FullPath
-
-    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_003_2_065_003_02-02_000.tig TCP15_159_037_003_65_R.tig
-    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_003_2_065_001_02-02_000.fits CP15_159_037_003_65_R.tig
-    truncate_cube -in TCP15_159_037_003_65_R.tig -out TTCP15_159_037_003_65_R.tig -wave 5100,9700
-    wr_desc -file TTCP15_159_037_003_65_R.tig -desc AIRMASS -val 0 -type double
-    apply_flux -flux    fxSolP_14_244_R.fits
-               -extinct extP_14_244.fits,LAMBDA,EXT \
-               -in      TTCP15_159_037_003_65_R.tig \
-               -out     XTCP15_159_037_003_65_R.tig
-    convert_file -inputformat "tiger+fits" -outputformat "euro3d" -quiet \
-                 -in  XTCP15_159_037_003_65_R.tig \
-                 -out e3d_XTCP15_159_037_003_65_R.fits
-    e3dto3d.py -o 3d_XTCP15_159_037_003_65_R.fits e3d_XTCP15_159_037_003_65_R
-"""
-
 # MAIN #########################################################################
 
 if __name__ == "__main__":
@@ -299,8 +263,9 @@ if __name__ == "__main__":
     run_preprocessing(frames)
 
     # Hard coded path: BAD, but working for now
-    # throuput estimate
     path = '/afs/in2p3.fr/group/snovae/snprod/SnfProd/nchotard/plan_scala'
+
+    # throuput estimate
     cmd = "python %s/SCALA_analysis_tools/SCALA_main.py " % path
     cmd += "-s %s -c %s" % (",".join(glob.glob('3d_U*.fits')),
                             ",".join(glob.glob('SC*.fits')))
@@ -308,21 +273,12 @@ if __name__ == "__main__":
     os.system("cp %s/SCALA_analysis_tools/*.txt ." % path)
     os.system(cmd)
 
-    """
-    # troughput comparison
-    # here we have to use the flux calibrated scala cube
-    # so we need to update the code to get the 065-000 Reduced SCALA cube,
-    # apply the flux solution of the night while making sure that airmass is set
-    # to zera and that the 90% loss in flux due to hte mask in not a problem
-    # (and apply the weith function when it will be ready)
-    # and do the analysis again with the option 't' set to False
-    # we also need the snifs transmission to be computed (PTR)
-    path = '/afs/in2p3.fr/group/snovae/snprod/SnfProd/nchotard/plan_scala'
+    # flux calibration of scala cubes
     cmd = "python %s/SCALA_analysis_tools/SCALA_main.py " % path
     cmd += "-s %s -c %s -t False" % (",".join(glob.glob('3d_U*.fits')),
                                      ",".join(glob.glob('SC*.fits')))
     print cmd
     os.system("cp %s/SCALA_analysis_tools/*.txt .")
     os.system(cmd)
-    """
+
 # End of plan_scala.py
