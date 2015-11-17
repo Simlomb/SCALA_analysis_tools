@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       16-11-2015 10:59:22
+## Modified at:       16-11-2015 12:07:08
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -132,6 +132,67 @@ class ScalaCalib:
             print "\n" + cmd
             print os.system(cmd)
 
+class ScalaFluxCalib:
+
+    def __init__(self, scube):
+
+        self.scube = scube
+
+    def truncate_cube(self):
+        print "# Truncate cube"
+        cmd = "truncate_cube -in %s -out %s -wave 5100,9700 -quiet -noask" % ('TCP15_159_037_007_60_R.tig',
+                                                                              'TTCP15_159_037_007_60_R.tig')
+
+    def change_header(self):
+        print "# Change airmass in the header"
+        cmd1 = "wr_desc -file %s -desc AIRMASS -type double -val 0" % 'TTCP15_159_037_007_60_R.tig'
+        cmd2 = "wr_desc -file %s -desc IAIRMASS -type double -val `rd_desc -file %s -desc AIRMASS -quiet`" % \
+               ('TTCP15_159_037_007_60_R.tig', 'TCP15_159_037_007_60_R.tig')
+
+    def flux_calibrate(self):
+        print "# Apply flux calibration"
+        cmd = "apply_flux -flux %s " % "fxSolP_15_159_R.fits"
+        cmd += "-extinct %s,LAMBDA,EXT " % "extP_15_159.fits"
+        cmd += "-in %s" % "TTCP15_159_037_007_60_R.tig "
+        cmd += "-out %s" % "XTCP15_159_037_007_60_R.tig"
+
+    def clean_table(self):
+        print "Clean the table"
+        cmd = "sel_table -in %s -sel all -quiet" % "CP15_159_037_007_60_R.fits"
+
+    def convert_files(self):
+        print "# Convert to e3d"
+        cmd = "convert_file -inputformat 'tiger+fits' -outputformat 'euro3d' -quiet "
+        cmd += "-in %s " % "XTCP15_159_037_007_60_R.tig"
+        cmd += "-out %s" % "e3d_XTCP15_159_037_007_60_R.fits"
+        
+        print "# Convert to 3d"
+        cmd = "e3dto3d.py -o %s %s" % ("3d_XTCP15_159_037_007_60_R.fits",
+                                     "e3d_XTCP15_159_037_007_60_R.fits")
+
+        
+        echo "# Copy files"
+    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_625_600_02-02_000.fits extP_15_159.fits
+    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_630_600_02-02_000.fits fxSolP_15_159_R.fits
+    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_007_2_065_003_02-02_000.tig TCP15_159_037_007_60_R.tig
+    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_007_2_065_001_02-02_000.fits CP15_159_037_007_60_R.fits
+
+    def write_commands(self):
+        self.truncate_cube()
+        self.change_header()
+        self.truncate()
+        self.convertfiles()
+
+    def run_commands(self):
+        cmds = []
+        cmds.append([self.quickCalib(verbose=False)])
+        cmds.append(self.unflatfield(verbose=False))
+        cmds.append([self.truncate(verbose=False)])
+        cmds.append(self.convertfiles(verbose=False))
+        for cmd in N.concatenate(cmds):
+            print "\n" + cmd
+            print os.system(cmd)
+
 def get_scala_cubes(night, version=202, status=2, fclass=65, run=None):
     """
     Get all the SCALA data from a given night
@@ -212,18 +273,12 @@ def test():
 
 def get_calib_files(year=15, day=159, channel=2):
     """
-    Return telluric correction, extinction and flux solution processes for
+    Return extinction and flux solution processes for
     a given night (year, day) and channel
     """
-    FclassTell = 620  # Telluric correction (w/ XFclassP)
     FclassExt = 625   # Extinction fclass (w/ XFclassS|XFclassM)
     FclassFxSol = 630 # Flux solution fclass (w/ XFclassS|XFclassM)
     XFclassP = 600    # XFclass multi-std photometric case
-    # Nightly multi-std telluric correction from PMS
-    tc = Process.objects.filter(Pose_FK__Exp_FK__Run_FK__Year=year,
-                                Pose_FK__Exp_FK__Run_FK__Day=day,
-                                Fclass=FclassTell, XFclass=XFclassP,
-                                Version=202)
     # Photometric nightly multi-std extinction, from PMS
     ex = Process.objects.filter(Pose_FK__Exp_FK__Run_FK__Year=year,
                                 Pose_FK__Exp_FK__Run_FK__Day=day,
@@ -234,7 +289,7 @@ def get_calib_files(year=15, day=159, channel=2):
                                 Pose_FK__Exp_FK__Run_FK__Day=day,
                                 Fclass=FclassFxSol, XFclass=XFclassP,
                                 Channel=channel, Version=202)
-    return tc, ex, fs
+    return ex, fs
 
 # MAIN #########################################################################
 
@@ -256,11 +311,14 @@ if __name__ == "__main__":
     clap_data = get_clap_data(opts.night, run=opts.run)
 
     # make local copy of the data
-    frames = copy_scala_cubes(scala_cubes)
+    calib_frames, flux_calib_frame = copy_scala_cubes(scala_cubes)
     copy_clap_data(clap_data)
 
     # run the preprocessing
     run_preprocessing(frames)
+
+    # run the flux calibration
+    run_flux_calibration(frames)
 
     # Hard coded path: BAD, but working for now
     path = '/afs/in2p3.fr/group/snovae/snprod/SnfProd/nchotard/plan_scala'
