@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       20-11-2015 11:33:18
+## Modified at:       20-11-2015 11:34:56
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -297,7 +297,6 @@ def run_preprocessing(frames):
 
 def run_flux_calibration(frames, ex_B, fs_B, ex_R, fs_R):
     pass
-    
 
 ## TESTS ##
 def get_test_data(idprocess='151511170082'):
@@ -371,12 +370,14 @@ if __name__ == "__main__":
     # run the preprocessing
     run_preprocessing(scala_cubes)
 
+    """
     # get the needed files for flux calibration
     ex_B, fs_B = get_calib_files(year=15, day=159, channel=4)
     ex_R, fs_R = get_calib_files(year=15, day=159, channel=2)
-    
+
     # run the flux calibration
     run_flux_calibration(frames)
+    """
 
     # Hard coded path: BAD, but working for now
     path = '/afs/in2p3.fr/group/snovae/snprod/SnfProd/nchotard/plan_scala'
@@ -389,6 +390,7 @@ if __name__ == "__main__":
     os.system("cp %s/SCALA_analysis_tools/*.txt ." % path)
     os.system(cmd)
 
+    """
     # flux calibration of scala cubes
     cmd = "python %s/SCALA_analysis_tools/SCALA_main.py " % path
     cmd += "-s %s -c %s -t False" % (",".join(glob.glob('3d_U*.fits')),
@@ -396,5 +398,6 @@ if __name__ == "__main__":
     print cmd
     os.system("cp %s/SCALA_analysis_tools/*.txt .")
     os.system(cmd)
+    """
 
 # End of plan_scala.py
