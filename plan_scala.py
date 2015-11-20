@@ -3,15 +3,16 @@
 ################################################################################
 ## Filename:          plan_scala.py
 ## Version:           $Revision: 1.0 $
-## Description:
+## Description:       Run the SCALA analysis on a given night
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       16-11-2015 12:07:08
+## Modified at:       20-11-2015 11:33:18
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
 """
+Run the SCALA analysis for a given night (run)
 """
 
 __author__ = "Nicolas Chotard <nchotard@ipnl.in2p3.fr>"
@@ -29,36 +30,83 @@ CODE_NAME = os.path.basename(__file__)
 def buildName(name, pre="", ext=""):
     """Build filename from name: remove path and extension, prepend prefix and
     append extension)."""
-
-    p, f = os.path.split(name)          # Remove path
-    f = os.path.splitext(f)[0]          # Remove extension
-    if ext:                             # Add an extension
+    # Remove path
+    p, f = os.path.split(name)
+    # Remove extension
+    f = os.path.splitext(f)[0]
+    if ext: # Add an extension          
         f = os.path.extsep.join((f, ext))
-    if pre:
-        f = pre + f                     # Prepend prefix
+    if pre: # Prepend prefix
+        f = pre + f                     
     return f
+
+class ScalaCube:
+
+    def __init__(self, scube):
+        """
+        Initialize a scala cube from a scala process (Fclass=65, XFclass=0)
+        with parents and auxiliary files
+        """
+        self.scala_cube = scube
+        self.channel = scube.Channel
+        self.flat = scube.Parent_FK.get(Fclass=300).AuxFiles_FK.get(XFclass=3)
+        self.wavelength_calibrated_table = scube.AuxFiles_FK.get(XFclass=1)
+        self.wavelength_calbrated_cube = scube.AuxFiles_FK.get(XFclass=2)
+        self.reduced_cube = scube.AuxFiles_FK.get(XFclass=3)
+        
+    def copy_files(self, path='./'):
+        """
+        Copu all the needed files to a given path
+        """
+        if not path.endswith('/'):
+            path += '/'
+        # the flat (tig)
+        os.system("cp -v %s%s %s" % (path,self.flat.File_FK.FullPath,
+                                     self.flat.File_FK.OName.lstrip('D')))
+        # the wavelength calibrated table (tig)
+        os.system("cp -v %s%s %s" % (path, self.flat.File_FK.FullPath,
+                                     self.flat.File_FK.OName.lstrip('D')))
+        # the wavelength calibrated cueb (tig)
+        os.system("cp -v %s%s %s" % (path, self.flat.File_FK.FullPath,
+                                   self.flat.File_FK.OName.lstrip('D')))
+        # the reduced cube (tig)
+        os.system("cp -v %s%s %s" % (path, self.flat.File_FK.FullPath,
+                                     self.flat.File_FK.OName.lstrip('D')))
  
 class ScalaCalib:
 
     def __init__(self, wcube, ffcube):
         self.channel = 'B' if '_B' in wcube else 'R'
         if self.channel == 'B':
-            self. wrange = "3300,5150" # Don't keep crap at ends!
+            # Don't keep crap at ends!
+            self. wrange = "3300,5150" 
         else:
-            self.wrange = "5100,10150" # Extended range for updated snifsmasks
-        self.wcube = wcube # input cube
-        self.ffcube = ffcube # flat
-        self.ccp_cube = 'C'+self.wcube[1:] # cosmic cleaned (and flatfielded)
-        self.uf_cube = 'UF'+self.wcube[1:] # cosmic cleaned (un-flatfielded)
-        self.tuf_cube = 'TUF'+self.wcube[1:] # truncated version
-        self.e3d_cube = "e3d_" + buildName(self.uf_cube) # Euro 3d cube
-        self.threed_cube = "3d_" + buildName(self.uf_cube) # 3d cube
-        self.e3d_tcube = "e3d_" + buildName(self.tuf_cube) # Euro 3d cube
-        self.threed_tcube = "3d_" + buildName(self.tuf_cube) # 3d cube
+            # Extended range for updated snifsmasks
+            self.wrange = "5100,10150"
+        # input cube
+        self.wcube = wcube
+        # flat
+        self.ffcube = ffcube
+        # cosmic cleaned (and flatfielded)
+        self.ccp_cube = 'C'+self.wcube[1:]
+        # cosmic cleaned (un-flatfielded)
+        self.uf_cube = 'UF'+self.wcube[1:]
+        # truncated version
+        self.tuf_cube = 'TUF'+self.wcube[1:]
+        # Euro 3d cube
+        self.e3d_cube = "e3d_" + buildName(self.uf_cube)
+        # 3d cube
+        self.threed_cube = "3d_" + buildName(self.uf_cube)
+        # Euro 3d cube
+        self.e3d_tcube = "e3d_" + buildName(self.tuf_cube)
+        # 3d cube
+        self.threed_tcube = "3d_" + buildName(self.tuf_cube)
 
     def quickCalib(self, verbose=True):
-        """Build the `quick_calib` command, with appropriate flat, flux and
-        domain options."""
+        """
+        Build the `quick_calib` command, with appropriate flat, flux and domain
+        options.
+        """
         cmd = "quick_calib -i %s" % (buildName(self.wcube)) #incube
         cmd += ' -l ' + self.ffcube # flat
         cmd += ' -x None' # no flux calibration
@@ -135,7 +183,9 @@ class ScalaCalib:
 class ScalaFluxCalib:
 
     def __init__(self, scube):
-
+        """
+        Initialize the ScalaFluxCalib class with a SCALA cube (F/XFclass=65/0)
+        """
         self.scube = scube
 
     def truncate_cube(self):
@@ -171,11 +221,11 @@ class ScalaFluxCalib:
                                      "e3d_XTCP15_159_037_007_60_R.fits")
 
         
-        echo "# Copy files"
-    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_625_600_02-02_000.fits extP_15_159.fits
-    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_630_600_02-02_000.fits fxSolP_15_159_R.fits
-    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_007_2_065_003_02-02_000.tig TCP15_159_037_007_60_R.tig
-    cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_007_2_065_001_02-02_000.fits CP15_159_037_007_60_R.fits
+        #echo "# Copy files"
+        #cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_625_600_02-02_000.fits extP_15_159.fits
+        #cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_630_600_02-02_000.fits fxSolP_15_159_R.fits
+        #cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_007_2_065_003_02-02_000.tig TCP15_159_037_007_60_R.tig
+        #cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_037_007_2_065_001_02-02_000.fits CP15_159_037_007_60_R.fits
 
     def write_commands(self):
         self.truncate_cube()
@@ -244,6 +294,10 @@ def run_preprocessing(frames):
     """Run all the preprocessing steps on the w-caloibrated cubes"""
     for frame in frames:
         frame.run_commands()
+
+def run_flux_calibration(frames, ex_B, fs_B, ex_R, fs_R):
+    pass
+    
 
 ## TESTS ##
 def get_test_data(idprocess='151511170082'):
@@ -315,8 +369,12 @@ if __name__ == "__main__":
     copy_clap_data(clap_data)
 
     # run the preprocessing
-    run_preprocessing(frames)
+    run_preprocessing(scala_cubes)
 
+    # get the needed files for flux calibration
+    ex_B, fs_B = get_calib_files(year=15, day=159, channel=4)
+    ex_R, fs_R = get_calib_files(year=15, day=159, channel=2)
+    
     # run the flux calibration
     run_flux_calibration(frames)
 
