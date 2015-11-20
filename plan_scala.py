@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       20-11-2015 11:34:56
+## Modified at:       20-11-2015 11:40:07
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -364,11 +364,13 @@ if __name__ == "__main__":
     clap_data = get_clap_data(opts.night, run=opts.run)
 
     # make local copy of the data
-    calib_frames, flux_calib_frame = copy_scala_cubes(scala_cubes)
+    #calib_frames, flux_calib_frame = copy_scala_cubes(scala_cubes)
+    calib_frames = copy_scala_cubes(scala_cubes)
     copy_clap_data(clap_data)
 
     # run the preprocessing
-    run_preprocessing(scala_cubes)
+    #run_preprocessing(scala_cubes)
+    run_preprocessing(calib_frames)
 
     """
     # get the needed files for flux calibration
