@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       20-11-2015 11:45:57
+## Modified at:       20-11-2015 11:52:04
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -385,11 +385,11 @@ if __name__ == "__main__":
     path = '/afs/in2p3.fr/group/snovae/snprod/SnfProd/nchotard/plan_scala'
 
     # throuput estimate
+    os.system("cp -f %s/SCALA_analysis_tools/*.txt ." % path)
     cmd = "python %s/SCALA_analysis_tools/SCALA_main.py " % path
     cmd += "-s %s -c %s" % (",".join(glob.glob('3d_U*.fits')),
                             ",".join(glob.glob('SC*.fits')))
     print cmd
-    os.system("cp -f %s/SCALA_analysis_tools/*.txt ." % path)
     os.system(cmd)
 
     """
