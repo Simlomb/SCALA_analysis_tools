@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       20-11-2015 11:40:07
+## Modified at:       20-11-2015 11:45:57
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -360,8 +360,8 @@ if __name__ == "__main__":
     night = str(opts.night).replace('_', '')
 
     # get the data
-    scala_cubes = get_scala_cubes(opts.night, run=opts.run)
-    clap_data = get_clap_data(opts.night, run=opts.run)
+    scala_cubes = get_scala_cubes(night, run=opts.run)
+    clap_data = get_clap_data(night, run=opts.run)
 
     # make local copy of the data
     #calib_frames, flux_calib_frame = copy_scala_cubes(scala_cubes)
@@ -389,7 +389,7 @@ if __name__ == "__main__":
     cmd += "-s %s -c %s" % (",".join(glob.glob('3d_U*.fits')),
                             ",".join(glob.glob('SC*.fits')))
     print cmd
-    os.system("cp %s/SCALA_analysis_tools/*.txt ." % path)
+    os.system("cp -f %s/SCALA_analysis_tools/*.txt ." % path)
     os.system(cmd)
 
     """
