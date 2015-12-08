@@ -7,7 +7,7 @@
 ## Author:            Nicolas Chotard <nchotard@ipnl.in2p3.fr>
 ## Author:            $Author: nchotard $
 ## Created at:        $Date: 03-11-0015 14:59:57 $
-## Modified at:       20-11-2015 11:52:04
+## Modified at:       08-12-2015 16:56:10
 ## $Id: plan_scala.py, v 1.0, 03-11-0015 14:59:57 nchotard Exp $
 ################################################################################
 
@@ -34,10 +34,10 @@ def buildName(name, pre="", ext=""):
     p, f = os.path.split(name)
     # Remove extension
     f = os.path.splitext(f)[0]
-    if ext: # Add an extension          
+    if ext: # Add an extension
         f = os.path.extsep.join((f, ext))
     if pre: # Prepend prefix
-        f = pre + f                     
+        f = pre + f
     return f
 
 class ScalaCube:
@@ -53,22 +53,22 @@ class ScalaCube:
         self.wavelength_calibrated_table = scube.AuxFiles_FK.get(XFclass=1)
         self.wavelength_calbrated_cube = scube.AuxFiles_FK.get(XFclass=2)
         self.reduced_cube = scube.AuxFiles_FK.get(XFclass=3)
-        
+
     def copy_files(self, path='./'):
         """
-        Copu all the needed files to a given path
+        Copy all the needed files to a given path
         """
         if not path.endswith('/'):
             path += '/'
         # the flat (tig)
-        os.system("cp -v %s%s %s" % (path,self.flat.File_FK.FullPath,
+        os.system("cp -v %s%s %s" % (path, self.flat.File_FK.FullPath,
                                      self.flat.File_FK.OName.lstrip('D')))
         # the wavelength calibrated table (tig)
         os.system("cp -v %s%s %s" % (path, self.flat.File_FK.FullPath,
                                      self.flat.File_FK.OName.lstrip('D')))
         # the wavelength calibrated cueb (tig)
         os.system("cp -v %s%s %s" % (path, self.flat.File_FK.FullPath,
-                                   self.flat.File_FK.OName.lstrip('D')))
+                                     self.flat.File_FK.OName.lstrip('D')))
         # the reduced cube (tig)
         os.system("cp -v %s%s %s" % (path, self.flat.File_FK.FullPath,
                                      self.flat.File_FK.OName.lstrip('D')))
@@ -79,7 +79,7 @@ class ScalaCalib:
         self.channel = 'B' if '_B' in wcube else 'R'
         if self.channel == 'B':
             # Don't keep crap at ends!
-            self. wrange = "3300,5150" 
+            self.wrange = "3300,5150"
         else:
             # Extended range for updated snifsmasks
             self.wrange = "5100,10150"
@@ -215,12 +215,12 @@ class ScalaFluxCalib:
         cmd = "convert_file -inputformat 'tiger+fits' -outputformat 'euro3d' -quiet "
         cmd += "-in %s " % "XTCP15_159_037_007_60_R.tig"
         cmd += "-out %s" % "e3d_XTCP15_159_037_007_60_R.fits"
-        
+
         print "# Convert to 3d"
         cmd = "e3dto3d.py -o %s %s" % ("3d_XTCP15_159_037_007_60_R.fits",
-                                     "e3d_XTCP15_159_037_007_60_R.fits")
+                                       "e3d_XTCP15_159_037_007_60_R.fits")
 
-        
+
         #echo "# Copy files"
         #cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_625_600_02-02_000.fits extP_15_159.fits
         #cp -v /sps/snovae/SRBregister/Prod/02-02/15/159/15_159_014_003_2_630_600_02-02_000.fits fxSolP_15_159_R.fits
@@ -268,10 +268,11 @@ def copy_scala_cubes(cubes):
                                  fcube.OName.lstrip('D')))
     return frames
 
-def get_clap_data(night, run=None):
+def get_clap_data(night, run=None, copy=True):
     """
     Has to be changed when the CLAP data will be stored into the DB. They are
     for now in /sps/snovae/SRBregister/SCALA/SCALA_Commissioning/CLAP_data
+    Alosr copy the list of clap data to the local directory if asked
     """
     clapdir = '/sps/snovae/SRBregister/SCALA/SCALA_Commissioning/CLAP_data'
     if run is None:
@@ -281,14 +282,9 @@ def get_clap_data(night, run=None):
                                                    int(night[2:]),
                                                    str(run).zfill(3))
     clapdata = glob.glob(nightdir)
-    return clapdata
-
-def copy_clap_data(claps):
-    """
-    Copy a list of claps data to the local directory
-    """
-    for clap in claps:
-        os.system("cp -v %s ." % clap)
+    if copy:
+        for clap in clapdata:
+            os.system("cp -v %s ." % clap)
 
 def run_preprocessing(frames):
     """Run all the preprocessing steps on the w-caloibrated cubes"""
@@ -354,6 +350,9 @@ if __name__ == "__main__":
     parser = optparse.OptionParser(usage, version=__version__)
     parser.add_option('-n', '--night', type='string', help="Night to work on")
     parser.add_option('-r', '--run', type='string', help="Run to work on")
+    parser.add_option('-m', '--mode', type='string', default='t',
+                      help="'t' for throughput, 'f' for flux calibration"
+                      "[%default]")
     opts, args = parser.parse_args()
 
     # make sure the night has the right format
@@ -361,15 +360,13 @@ if __name__ == "__main__":
 
     # get the data
     scala_cubes = get_scala_cubes(night, run=opts.run)
-    clap_data = get_clap_data(night, run=opts.run)
 
     # make local copy of the data
+    scubes = [ScalaCube(c) for c in scala_cubes]
+    calib_frames = copy_scala_cubes(scubes)
     #calib_frames, flux_calib_frame = copy_scala_cubes(scala_cubes)
-    calib_frames = copy_scala_cubes(scala_cubes)
-    copy_clap_data(clap_data)
 
     # run the preprocessing
-    #run_preprocessing(scala_cubes)
     run_preprocessing(calib_frames)
 
     """
@@ -383,6 +380,9 @@ if __name__ == "__main__":
 
     # Hard coded path: BAD, but working for now
     path = '/afs/in2p3.fr/group/snovae/snprod/SnfProd/nchotard/plan_scala'
+
+    # get the clap data
+    get_clap_data(night, run=opts.run, copy=True)
 
     # throuput estimate
     os.system("cp -f %s/SCALA_analysis_tools/*.txt ." % path)
