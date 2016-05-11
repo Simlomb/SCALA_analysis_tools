@@ -77,6 +77,6 @@ class Simulate():
             self.m = N.zeros((len(MIRROR_CALIB)))
             for i in range(len(MIRROR_CALIB)):
                 self.m[i] = self._randomize_me_(MIRROR_CALIB[i,1],MIRROR_CALIB[i,2])
-            self.interp_func1.append(interpolate.interp1d(MIRROR_CALIB[:,0], MIRROR_CALIB[:,1], kind='linear'))
+            self.interp_func1.append(interpolate.interp1d(MIRROR_CALIB[:,0], MIRROR_CALIB[:,1], kind='linear',bounds_error=False, fill_value=0.))
         return self.interp_func1
 

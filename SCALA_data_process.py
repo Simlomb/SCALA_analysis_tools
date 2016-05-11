@@ -72,7 +72,7 @@ class SCALA_Calib:
         self.cross_talk0 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,1], kind='linear') #light measurement from clap0
         self.cross_talk1 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,3], kind='linear') # cross talk measurement from clap1
         self.Inter1, self.var_Inter1 = self.interpolate_arm_curve(4)
-
+        self.clap_data, self.integrated_clap, self.integrated_clap2 = [],[],[]
         if list_SCALA != []:
             self.list_SCALA = sorted(list_SCALA)
             self.scala_B_channel, self.scala_R_channel =[],[]
@@ -82,7 +82,7 @@ class SCALA_Calib:
                 else:
                     self.scala_R_channel = N.append(self.scala_R_channel, s)
         
-            self.snifs_data_B, self.snifs_data_R, self.clap_data, self.integrated_clap, self.integrated_clap2 = [],[],[],[],[]
+            self.snifs_data_B, self.snifs_data_R = [],[]
             
         print "First I load clap and snifs data and I fit all the CLap data"
         for i in range(len(self._clap_files)):
@@ -103,7 +103,7 @@ class SCALA_Calib:
                     self.integrated_clap2.append(self.clap_data[i].other_light)
                 else:
                     print "Applying cross talk correction to file %s" %self._clap_files[i]
-                    clap0_class = Cdp.Clap0_Data(self._clap_files[i][0:2]+'0'+self._clap_files[i][3:])
+                    clap0_class = Cdp.Clap0_Data(self.clap_files0[i])
                     clap0_light_level = clap0_class.sig_back(self.clap_data[i].mask_list, no_snifs=True)
                     cross_talk_correction = self.cross_talk1(self.clap_data[i].lbda)*(-clap0_light_level[0])/self.cross_talk0(self.clap_data[i].lbda)
                     self.clap_data[i].sig_back(cross_talk_correction,no_out=True)
