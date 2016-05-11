@@ -14,18 +14,13 @@ class Simulate():
     
     def __init__(self,clap_number):
 
-        #self.x           = N.linspace(3200.,10000.,3000)
         self.clap_number = clap_number
         random.seed()
         if clap_number == None:
             self.interpolate_mirror = self.A18_calib()
-            #self.interpolated_value = N.mean(interpolate_mirror)
-            #self.error_value        = N.std(interpolate_mirror)/N.sqrt(len(interpolate_mirror))
         else:
             self.interpolate_array = self.Iterate_interp()
-            #self.interpolated_value = N.mean(interpolate_array, axis=1)
-            #self.error_value        = N.std(interpolate_array, axis=1)/N.sqrt(len(interpolate_array[0,:]))
-
+           
     def _randomize_me_(self,val,err,Npoints=1):
         """
         """
@@ -83,13 +78,5 @@ class Simulate():
             for i in range(len(MIRROR_CALIB)):
                 self.m[i] = self._randomize_me_(MIRROR_CALIB[i,1],MIRROR_CALIB[i,2])
             self.interp_func1.append(interpolate.interp1d(MIRROR_CALIB[:,0], MIRROR_CALIB[:,1], kind='linear'))
-        '''
-        else:                            
-            self.interp_func1 = N.zeros((len(self.x),100))
-            for j in range(100):
-                self.m = N.zeros((len(MIRROR_CALIB)))
-                for i in range(len(MIRROR_CALIB)):
-                    self.m[i] = self._randomize_me_(MIRROR_CALIB[i,1],MIRROR_CALIB[i,2])
-                self.interp_func1[:,j] = interpolate.interp1d(MIRROR_CALIB[:,0], MIRROR_CALIB[:,1], kind='linear')
-        '''
         return self.interp_func1
+
