@@ -48,19 +48,20 @@ class SnifsData:
 class SCALA_Calib:
     """
     """
-    def __init__(self,list_SCALA, list_CLAP, analys_type, clap_number=1,spaxel_sub=0):
+    def __init__(self,list_SCALA, list_CLAP, analys_type, path='empty', clap_number=1,spaxel_sub=0):
         """
         
         """
-    
-        self.list_SCALA = sorted(list_SCALA)
         self.list_CLAP = sorted(list_CLAP)
         self.analys_type = analys_type
         self._clap_number = clap_number
         self._spaxel_sub = spaxel_sub
-        
-        self.clap_files0  = [i for i in self.list_CLAP if i[2] == '0']
-        self.clap_files1  = [i for i in self.list_CLAP if i[2] == '1']
+        if path != 'empty':
+            self.clap_files0  = [path+i for i in self.list_CLAP if i[2] == '0']
+            self.clap_files1  = [path+i for i in self.list_CLAP if i[2] == '1']
+        else:
+            self.clap_files0  = [i for i in self.list_CLAP if i[2] == '0']
+            self.clap_files1  = [i for i in self.list_CLAP if i[2] == '1']
         if self._clap_number == 0:
             self._clap_files = self.clap_files0
         else:
@@ -70,19 +71,24 @@ class SCALA_Calib:
         cross_talk1 = N.loadtxt('crosstalk_clap1.txt')
         self.cross_talk0 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,1], kind='linear') #light measurement from clap0
         self.cross_talk1 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,3], kind='linear') # cross talk measurement from clap1
-        
-        self.scala_B_channel, self.scala_R_channel =[],[]
-        for s in self.list_SCALA :
-            if s.split(".")[0][-1] == 'B':
-                self.scala_B_channel = N.append(self.scala_B_channel, s)
-            else:
-                self.scala_R_channel = N.append(self.scala_R_channel, s)
         self.Inter1, self.var_Inter1 = self.interpolate_arm_curve(4)
-        self.snifs_data_B, self.snifs_data_R, self.clap_data, self.integrated_clap, self.integrated_clap2 = [],[],[],[],[]
+
+        if list_SCALA != []:
+            self.list_SCALA = sorted(list_SCALA)
+            self.scala_B_channel, self.scala_R_channel =[],[]
+            for s in self.list_SCALA :
+                if s.split(".")[0][-1] == 'B':
+                    self.scala_B_channel = N.append(self.scala_B_channel, s)
+                else:
+                    self.scala_R_channel = N.append(self.scala_R_channel, s)
+        
+            self.snifs_data_B, self.snifs_data_R, self.clap_data, self.integrated_clap, self.integrated_clap2 = [],[],[],[],[]
+            
         print "First I load clap and snifs data and I fit all the CLap data"
         for i in range(len(self._clap_files)):
-            self.snifs_data_B.append(SnifsData(self.scala_B_channel[i]))
-            self.snifs_data_R.append(SnifsData(self.scala_R_channel[i]))
+            if list_SCALA != []:
+                self.snifs_data_B.append(SnifsData(self.scala_B_channel[i]))
+                self.snifs_data_R.append(SnifsData(self.scala_R_channel[i]))
             if clap_number == 0:
                 print "WARNING the next step will not work because you are not using the class Clap0_Data for clap 0"
                 break
