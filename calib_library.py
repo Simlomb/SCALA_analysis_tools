@@ -3,10 +3,11 @@
 from scipy import interpolate
 import numpy             as N
 import random
+import os
+DATAPATH = os.path.realpath(__file__).split('calib_library.py')[0]+'refdata/'
 
-
-p0     = N.loadtxt("CLAP0_cal_new.txt")
-p1     = N.loadtxt("CLAP1_cal_new.txt")
+p0     = N.loadtxt(DATAPATH+"CLAP0_cal_new.txt")
+p1     = N.loadtxt(DATAPATH+"CLAP1_cal_new.txt")
 random.seed()
 
 class Simulate():

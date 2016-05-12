@@ -13,6 +13,10 @@ from os.path import isfile,isdir, join
 import scipy.constants as SC
 import CLAP_data_process as Cdp
 from scipy import interpolate
+import os
+
+DATAPATH = os.path.realpath(__file__).split('SCALA_data_process.py')[0]+'refdata/'
+
 
 class SnifsData:
     """
@@ -68,7 +72,7 @@ class SCALA_Calib:
             self._clap_files = self.clap_files1       
 
          ## files to be used for the clap data cross talk correction
-        cross_talk1 = N.loadtxt('crosstalk_clap1.txt')
+        cross_talk1 = N.loadtxt(DATAPATH+'crosstalk_clap1.txt')
         self.cross_talk0 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,1], kind='linear') #light measurement from clap0
         self.cross_talk1 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,3], kind='linear') # cross talk measurement from clap1
         self.Inter1, self.var_Inter1 = self.interpolate_arm_curve(4)
@@ -123,7 +127,7 @@ class SCALA_Calib:
         for one of the arm the arm_number and return the averaged intrerpolation
         curve computed on the lbd_weight datapoints
         """
-        arm_data = N.loadtxt('arm%s_profile.txt' %arm_number)
+        arm_data = N.loadtxt(DATAPATH+'arm%s_profile.txt' %arm_number)
         arm_data[:,0] = arm_data[:,0]*10.
         interpolation = []
         for j in range(100):

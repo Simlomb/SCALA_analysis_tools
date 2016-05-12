@@ -8,7 +8,6 @@ import optparse
 import SCALA_data_process as SC
 from os import listdir
 from os.path import isfile,isdir, join
-import os, sys
 ##########################################################################
 ###############################  MAIN  ###################################
 ##########################################################################
@@ -32,11 +31,7 @@ if __name__ == '__main__':
     else:
         c_list = sorted([ f for f in listdir(str(opts.path)) if isfile(join(str(opts.path),f)) and f.split(".")[0][:2]=="SC"])
     
-   # src = ['/Users/simonalombardo/SCALA_analysis_tools/CLAP0_cal_new.txt', '/Users/simonalombardo/SCALA_analysis_tools/CLAP1_cal_new.txt','/Users/simonalombardo/SCALA_analysis_tools/Calibration_mirror_ratio_new.txt', '/Users/simonalombardo/SCALA_analysis_tools/arm4_profile.txt', '/Users/simonalombardo/SCALA_analysis_tools/crosstalk_clap1.txt']
-   # dst = [str(opts.directory)+'CLAP0_cal_new.txt', str(opts.directory)+'CLAP1_cal_new.txt',str(opts.directory)+'Calibration_mirror_ratio_new.txt', str(opts.directory)+'arm4_profile.txt', str(opts.directory)+'crosstalk_clap1.txt']
-    #for i in range(len(src)):
-    #    os.link(src[i], dst[i])
-    
+   
     scala = SC.SCALA_Calib([], c_list, 't', path=str(opts.path))
     geometric_factor = 201.06/(0.33*2.39e-4)
     clap_lbd,integ_clap1 = [],[]
