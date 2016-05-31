@@ -227,12 +227,21 @@ class Clap:
         index_rem_cosm = x_array_sig[1:]-x_array_sig[:-1]
         mask_rem_cosm = index_rem_cosm>0.010
         mask_rem_cosm = N.insert(mask_rem_cosm,len(mask_rem_cosm)/2,False)
+        dim = len(x_array_sig)-len(x_array_sig[-mask_rem_cosm])
         # we apply this mask to get the entire signal dataset
-        data_new_sig = all_data[-mask]
         # this method actually cut also the rising and decreasing part of the signal which must be considered as well
-        # we use the information got untill now only to compute the initial guess of the parameters of the fit performed later
+        data_new_sig = all_data[-mask]
         x_corrected = x_array_sig[-mask_rem_cosm]
         data_corrected = data_new_sig[-mask_rem_cosm]
+        # the following loop helps eliminating residual cosmics
+        while dim>0:
+            index_rem_cosm = x_corrected[1:]-x_corrected[:-1]
+            mask_rem_cosm = index_rem_cosm>0.010
+            mask_rem_cosm = N.insert(mask_rem_cosm,len(mask_rem_cosm)/2,False)
+            dim = len(x_corrected)-len(x_corrected[-mask_rem_cosm])
+            x_corrected = x_corrected[-mask_rem_cosm]
+            data_corrected = data_corrected[-mask_rem_cosm]
+        # we use the information got untill now only to compute the initial guess of the parameters of the fit performed later
         # we compute a first estimate of the exposure time of the single wavelength counting how many data are in the signal
         # we use this value to compute the half width of the top hat (w) and its center (xe) 
         #self.sub_exp  = N.append(self.sub_exp,  x_corrected[-1] -  x_corrected[0])

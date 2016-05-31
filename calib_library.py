@@ -70,7 +70,7 @@ class Simulate():
 
     def A18_calib(self):
 
-        MIRROR_CALIB = N.loadtxt("Calibration_mirror_ratio_new.txt")
+        MIRROR_CALIB = N.loadtxt(DATAPATH+"Calibration_mirror_ratio_new.txt")
         
         
         self.interp_func1 = []
