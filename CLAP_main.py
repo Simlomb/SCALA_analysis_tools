@@ -40,7 +40,8 @@ if __name__ == '__main__':
     # only int is an array with the clap values integrated over the time
 
     for n in range(len(scala.clap_data)):
-        clap_lbd = N.append(clap_lbd,scala.clap_data[n].lbda)
+        lbd_new = scala.clap_data[n].snifs_wave_from_clap(scala.clap_data[n].lbda)
+        clap_lbd = N.append(clap_lbd,lbd_new)
         A18_value = N.mean([f(clap_lbd[n]) for f in scala.A18])
         if N.shape(A18_value) != ():
             for j in range(len(scala.clap_data[n].lbda)):

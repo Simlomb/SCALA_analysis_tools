@@ -280,23 +280,24 @@ class Clap:
         function compiuted with linear fit in fit_clap_snifs_wave.py
         add new data there when ready. results of that fit y=x*m+c:
         for wavelength <=5000.
-        [  0.99553739,  22.2140675 ],
-        [[  9.98033367e-07,  -4.12800690e-03],
-        [ -4.12800690e-03,   1.73306163e+01]]
+        array([  0.9985409 ,  19.55074642]),
+        array([[  5.42283511e-08,  -2.24787767e-04],
+        [ -2.24787767e-04,   9.46129317e-01]])
        
         for wavelength >5000.:
-        [  0.99825596,  23.08147605],
-        [[  9.30000965e-09,  -6.89921453e-05],
-        [ -6.89921453e-05,   5.32810369e-01]]
+        (array([  0.99826321,  23.70693881]),
+        array([[  2.28328894e-09,  -1.70968873e-05],
+        [ -1.70968873e-05,   1.33349329e-01]])
        
         This function is needed to compute the central wavelength for the
         a18 study considering that the wavelength from monochromator
         is not reproducible and sliglthly different from snifs's
         """
         if clap_wave <= 5000.:
-            return (clap_wave* 0.99553739 + 22.2140675)
+            return (clap_wave* 0.9985409 + 19.55074642)
         else:
-            return (clap_wave*0.99825596 + 23.08147605)
+            return (clap_wave* 0.99826321 + 23.70693881)
+
 
 
 
