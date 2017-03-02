@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # - Analysis of CLAPs data by Simona Lombardo
-# - 2015
+# - 2017
 # -*- coding: utf-8 -*-
 
 #! /usr/bin/env python
@@ -67,69 +67,6 @@ class Clap:
         return flagout
 
 
-    def residuals(self,p, y, x):
-        """
-        the function that describes CLAPs data has to be minimized using this new function
-        the parameters are:
-        1) a is the amplitude of the signal
-        2) b is the steepness of the curve from the background to the signal
-        3) w is the half of the width of the top hat
-        4) xe is the center of the top hat
-        5) back is the background level
-        INPUT:
-               p : array containing the values for the fitting function
-                   (b,a,w,xe,back)
-               y : array of data to fit
-               x : array of corresponding x values to the y
-        OUTPUT:
-               err: residuals of the fit
-        """
-        
-        b,a,w,xe,back = p
-        err = (y - ((a/4.)*(erf(b*(w+x-xe))+1)*(erf(b*(w-x+xe))+1)+back))
-        return err
-
-    def data_shape(self,x,p):
-        """
-        Function describing the shape of the CLAPs data
-        INPUT :
-               x : array of the x axis of the data
-               p : array containing the parameters
-                   describing the function. p is the same as
-                   described in residuals
-        OUTPUT:
-               the y array computed according to the function
-        """
-
-        return ((p[1]/4.)*(erf(p[0]*(p[2]+x-p[3]))+1)*(erf(p[0]*(p[2]-x+p[3]))+1))
-
-    def data_integral(self, x,y,data_clipped, sub_exp, x0, back):
-        """
-        It fits the data using the residuals function and integrate
-        over the area covered by that function
-        INPUT :
-               x           : array of x
-               y           : array of data
-               data_clipped: light level (signal amplitude)
-               sub_expo    : exposure time for one wavelength
-               x0          : time of beginning of the exposure
-               back        : background level of the exposure
-               sigma       : uncertainty on the y data
-        OUTPUT:
-               light       : integrated value of the light
-                             exposure for one wavelength
-               err         : error on the light parameter
-        """
-        # first guess of fit parameters
-        slope = data_clipped/(223.591-223.584) # the b parameter
-        w     = (sub_exp/2.)+0.0025            # the w parameter
-        xe    = w - 0.0025 + x0     # the xe parameter
-        p     = [slope,data_clipped,w,xe,0.]
-        # the fit of the data
-        fit  = leastsq(self.residuals, p, args=(-(y-back), x))
-        # the integral of the total amount of light produced by SCALA
-        light, err = integrate.quad(self.data_shape, x[0], x[-1], args=(fit[0]))
-        return light, err
 
     def line_two_point(self,x0, y0,x,err_y0,full_line=True):
         """
@@ -138,24 +75,13 @@ class Clap:
         y1,y2 = y0
         y1_err,y2_err = err_y0
         m = (y2 - y1)/(x2 - x1)
-        err_m = (y2_err+y1_err)/(x2 - x1)
         q = -x1*((y2 - y1)/(x2 -x1)) + y1
-        err_q = (x1/(x2 -x1))*(y2_err+y1_err)+y1_err
-        if full_line:
-            #lets consider only the error in the middle of the slope as background error
-            err_middle = err_m*(x1+(x2-x1)/2.)+err_q
-            return (m*x + q),err_middle
-        else:
-            return m,q
+        y = ((x-x1)/(x2-x1))*(y2-y1) + y1
+        x3 = (x2-x1)/2.
+        #lets consider only the error in the middle of the slope as background error
+        var_middle = ((x3)/(x2-x1))**2*(y1_err+y2_err)+y1_err
+        return y,var_middle#((N.sqrt(y1_err)+N.sqrt(y2_err))/2)**2
     
-    def line_intersection(self,m,q):
-        """
-        Compute the intersection point between two lines
-        """
-        m1,m2 = m
-        q1,q2 = q
-        return (q2-q1)/(m1-m2)
-
     def compute_background(self,clip_back,x_b,start,end):
         """
         compute the mask to apply to background left and right
@@ -172,39 +98,64 @@ class Clap:
         """
         This is the background removal in the case of linear changes
         No strong light leaks
+        the function compute a linear regression on both
+        backgrounds (left and right) and produces an array of data with the length of the full line
+        (back left, signal, back right) where the linear fit has been subtracted
+        it also generates the errors propagated on each data
+        INPUT
+             clip_back : array with the clipped (cosmic removed) background
+                         data
+             x_b       : array with the time associeted to the previous data
+             mask_l    : mask used to separete the background left data (Boolean)
+             mask_r    : mask used to separete the background right data (Boolean)
+             all_data  : array with all data (back left, signal, back right)
+             x_all     : array with corresponding time to all_data
         """
         
         reclip_back_l = clip_back[mask_l][:-9] #clipped background left
         x_back_l = x_b[mask_l][:-9]
         reclip_back_r = clip_back[mask_r][10:] #clipped background right
         x_back_r = x_b[mask_r][10:]
-
+        ###
+        ### OLD VERSION WITH
+        ### BACKGROUND COMPUTED IN TWO
+        ### AVERAGED POINTS, LEFT AND RIGHT
+        ### ANDD THEN A LINE TRHOU THEM
+        ### if you want to use it check the output shape (error)
         # Now we compute the two avereged point for the linear fit
-        y0_l = N.array((N.mean(reclip_back_l[:len(reclip_back_l)/2]),N.mean(reclip_back_l[len(reclip_back_l)/2:]))) # for the left side
-        y0_lerr = N.array((N.var(reclip_back_l[:len(reclip_back_l)/2])/(len(reclip_back_l)/2.),N.var(reclip_back_l[len(reclip_back_l)/2:])/(len(reclip_back_l)/2.)))
-        y0_r = N.array((N.mean(reclip_back_r[:len(reclip_back_r)/2]),N.mean(reclip_back_r[len(reclip_back_r)/2:]))) # for the right side
-        y0_rerr = N.array((N.var(reclip_back_r[:len(reclip_back_r)/2])/(len(reclip_back_r)/2.),N.var(reclip_back_r[len(reclip_back_r)/2:])/(len(reclip_back_r)/2.)))
-        x0_l = N.array((N.mean(x_back_l[:len(x_back_l)/2]),N.mean(x_back_l[len(x_back_l)/2:])))
-        x0_r = N.array((N.mean(x_back_r[:len(x_back_r)/2]),N.mean(x_back_r[len(x_back_r)/2:])))
-        # compute the line for those two points in the back left and right
-        m_l,q_l = self.line_two_point(x0_l,y0_l,x_back_l,y0_lerr,full_line=False) # parameters for left line
-        m_r,q_r = self.line_two_point(x0_r,y0_r,x_back_r,y0_rerr,full_line=False) # parameters for left line
-        # lets find the interception between the two
-        x_intercept = self.line_intersection(N.array((m_l,m_r)), N.array((q_l,q_r)))
-        #if x_intercept >= x_back_l[-1] and x_intercept <= x_back_r[0]:
-        #    # Now we separete the all dataset and apply the linear fit consequently
-        #    mask_slope = x_all<=x_intercept 
-        #    data_corrected = N.append((all_data[mask_slope]- self.line_two_point(x0_l,y0_l,x_all[mask_slope])), (all_data[-mask_slope]- self.line_two_point(x0_r,y0_r,x_all[-mask_slope])))
-        #else:
-        y0 = N.array((N.mean(reclip_back_l),N.mean(reclip_back_r)))
-        #if y0[0]>y0[1]+300.:
-        #    mean_slope,err_slope =  self.line_two_point(x0_l,y0_l,x_all,y0_lerr)
-        #else:
-        y0_err = N.array((N.var(reclip_back_l)/len(reclip_back_l),N.var(reclip_back_r)/len(reclip_back_r)))
-        x0 = N.array((N.mean(x_back_l),N.mean(x_back_r)))
-        mean_slope,err_slope =  self.line_two_point(x0,y0,x_all,y0_err)
-        data_corrected = (all_data-mean_slope)
-        return data_corrected,err_slope
+        #y0_l = N.array((N.mean(reclip_back_l[:len(reclip_back_l)/2]),N.mean(reclip_back_l[len(reclip_back_l)/2:]))) # for the left side
+        #y0_lerr = N.array((N.var(reclip_back_l[:len(reclip_back_l)/2])/(len(reclip_back_l)/2.),N.var(reclip_back_l[len(reclip_back_l)/2:])/(len(reclip_back_l)/2.)))
+        #y0_r = N.array((N.mean(reclip_back_r[:len(reclip_back_r)/2]),N.mean(reclip_back_r[len(reclip_back_r)/2:]))) # for the right side
+        #y0_rerr = N.array((N.var(reclip_back_r[:len(reclip_back_r)/2])/(len(reclip_back_r)/2.),N.var(reclip_back_r[len(reclip_back_r)/2:])/(len(reclip_back_r)/2.)))
+        #x0_l = N.array((N.mean(x_back_l[:len(x_back_l)/2]),N.mean(x_back_l[len(x_back_l)/2:])))
+        #x0_r = N.array((N.mean(x_back_r[:len(x_back_r)/2]),N.mean(x_back_r[len(x_back_r)/2:])))
+        #y0 = N.array((N.mean(reclip_back_l),N.mean(reclip_back_r)))
+        #y0_err = N.array((N.var(reclip_back_l)/len(reclip_back_l),N.var(reclip_back_r)/len(reclip_back_r)))
+        #x0 = N.array((N.mean(x_back_l),N.mean(x_back_r)))
+        #mean_slope,err_slope =  self.line_two_point(x0,y0,x_all,y0_err)
+        #data_corrected = (all_data-mean_slope)
+        #return data_corrected,err_slope
+        ###
+        ### NEW WAY WITH LINEAR REGRESSION
+        bak_tt = N.append(reclip_back_l,reclip_back_r)
+        y_mean = N.mean(bak_tt)
+    
+        time_tt = N.append(x_back_l,x_back_r)
+        x_mean = N.mean(time_tt)
+        std_x_mean = N.std(time_tt)
+        std_y_mean = N.std(bak_tt)
+        x_new_tt = time_tt - x_mean
+        cov = (1./len(bak_tt))*N.sum((bak_tt-y_mean)*(x_new_tt)) #cov(x,y)
+        slope = cov/std_x_mean**2
+        y_linear = (x_all-x_mean)*slope + y_mean
+        y_linearb = (x_new_tt)*slope + y_mean
+        var_y = N.sum((bak_tt-y_linearb)**2)/(len(bak_tt)-2)
+        var_slope = len(bak_tt)*var_y/((len(bak_tt)*N.sum(x_new_tt**2))-N.sum(x_new_tt)**2)
+        data_corrected = (all_data-y_linear)
+        err_data_corrected = var_slope*(x_all-x_mean)**2 + slope**2*std_x_mean**2+std_y_mean**2
+        return data_corrected,err_data_corrected
+        
+        
 
     def separate_sig_back(self, all_data,x_array,line,error_data=None,mask_data=None):
         """
@@ -231,8 +182,12 @@ class Clap:
         # we apply this mask to get the entire signal dataset
         # this method actually cut also the rising and decreasing part of the signal which must be considered as well
         data_new_sig = all_data[-mask]
+        if error_data != None:
+                error_data_sig = error_data[-mask]
         x_corrected = x_array_sig[-mask_rem_cosm]
         data_corrected = data_new_sig[-mask_rem_cosm]
+        if error_data != None:
+                error_data_sig = error_data_sig[-mask_rem_cosm]
         # the following loop helps eliminating residual cosmics
         while dim>0:
             index_rem_cosm = x_corrected[1:]-x_corrected[:-1]
@@ -241,6 +196,8 @@ class Clap:
             dim = len(x_corrected)-len(x_corrected[-mask_rem_cosm])
             x_corrected = x_corrected[-mask_rem_cosm]
             data_corrected = data_corrected[-mask_rem_cosm]
+            if error_data != None:
+                error_data_sig = error_data_sig[-mask_rem_cosm]
         # we use the information got untill now only to compute the initial guess of the parameters of the fit performed later
         # we compute a first estimate of the exposure time of the single wavelength counting how many data are in the signal
         # we use this value to compute the half width of the top hat (w) and its center (xe) 
@@ -259,20 +216,15 @@ class Clap:
             #err_back = error_data[mask]
             #err_clip_back = err_back[-mask_clean]
             #return x_corrected, data_corrected,err_sig_corr, x_b, clip_back,err_clip_back, mask
-            return x_corrected, data_corrected, x_b, clip_back, mask
+            error_data_back = error_data[mask]
+            error_data_back = error_data_back[-mask_clean]
+            return x_corrected, data_corrected, x_b, clip_back, mask,error_data_sig,error_data_back
+        elif  error_data != None and mask_data != None:
+            error_data_back = error_data[mask]
+            error_data_back = error_data_back[-mask_clean]
+            return x_corrected, data_corrected, x_b, clip_back,error_data_sig,error_data_back
         else:
             return x_corrected, data_corrected, x_b, clip_back
-
-
-    def weighted_avg_and_stderr(self,values, weights):
-        """
-        Return the weighted average and variance.
-
-        values, weights -- Numpy ndarrays with the same shape.
-        """
-        average = N.average(values, weights=weights)
-        variance = N.average((values-average)**2, weights=weights)/(len(values)-1)
-        return (average, variance)
         
 
     def snifs_wave_from_clap(self,clap_wave):
@@ -293,10 +245,19 @@ class Clap:
         a18 study considering that the wavelength from monochromator
         is not reproducible and sliglthly different from snifs's
         """
-        if clap_wave <= 5000.:
-            return (clap_wave* 0.9985409 + 19.55074642)
+        if N.shape(clap_wave) != ():
+            new_wave=[]
+            for i in clap_wave:
+                if i <= 5000.:
+                    new_wave = N.append(new_wave,i* 0.9985409 + 19.55074642)
+                else:
+                    new_wave = N.append(new_wave,i* 0.99826321 + 23.70693881)
+            return new_wave
         else:
-            return (clap_wave* 0.99826321 + 23.70693881)
+            if clap_wave <= 5000.:
+                return (clap_wave* 0.9985409 + 19.55074642)
+            else:
+                return (clap_wave* 0.99826321 + 23.70693881)
 
 
 
@@ -334,7 +295,7 @@ class Clap1_Data(Clap):
         # the data if we use the mask from the CLAP1 analysis and therefore
         # we have to save this information 
         self.mask_list = [1.] # mask to separate the signal data from the background
-        self.light, self.other_light = [0.,0.],[0.,0.]
+        self.light = [0.,0.]
         #-- Data clipped --#
         # Loop over the different wavelengths in a file
         # analysing every single block of back-signal-back data 
@@ -342,7 +303,7 @@ class Clap1_Data(Clap):
             #print i
             # first we remove the nan from the data (clap1)
             data_new = N.asarray([l for l in self.data[i,:] if N.isnan(l)==False])
-            x_array = N.linspace(self.time_start[i],self.time_stop[i],len(data_new))
+            x_array = N.linspace(self.time_start[i],self.time_start[i]+(len(data_new)/1000.),len(data_new))
             x_corrected, sig_corrected, x_b, clip_back = self.separate_sig_back(data_new,x_array,i)
             
             # we can now compute the mean value of the signal
@@ -354,67 +315,52 @@ class Clap1_Data(Clap):
             if -(raw_mean_clip-N.mean(clip_back[mask_r])) <= 5.:
                 print "shutter issue at wave %d, Please check file '%s'" %(self.lbda[i],self.clap_file)
                 integral_result = N.array((0.,0.))
-                self.light = N.vstack((self.light, integral_result))
-                self.other_light = N.vstack((self.other_light,integral_result))
+                self.light = N.vstack((self.other_light,integral_result))
             else:
                 # lets apply the linear fit to remove the background
                 data_new_corrected, err_back_corrected = self.remove_back(clip_back,x_b,mask_l,mask_r,data_new,x_array)
-                x_new_correct, sig_new_correct,x_b_correct, clip_back_correct,mask = self.separate_sig_back(data_new_corrected,x_array,i,error_data=err_back_corrected)
+                x_new_correct, sig_new_correct,x_b_correct, clip_back_correct,mask,error_data_sig,error_data_back = self.separate_sig_back(data_new_corrected,x_array,i,error_data=err_back_corrected)
                 mask_l_new, mask_r_new = self.compute_background(clip_back_correct,x_b_correct,x_new_correct[0],x_new_correct[-1])
                 back_corrected = N.append(clip_back_correct[mask_l_new][:-9],clip_back_correct[mask_r_new][10:])
-                #err_back_corrected = N.append(err_back_corr[mask_l_new][:-9],err_back_corr[mask_r_new][10:])
-                #mean_back,err_mean_back =  self.weighted_avg_and_stderr(back_corrected,1/err_back_corrected)
                 mean_back = N.mean(back_corrected)
-                #print i, mean_back,N.sqrt(err_back_corrected)
+                err_back_Corr = N.var(back_corrected)/len(back_corrected)
+                #print i, mean_back#,N.sqrt(err_back_corrected)
                 # lets compose the cleaned data set so that we can integrate all data with simpsons without any cosmics
-                data_cleaned, x_cleaned = [],[]
+                data_cleaned, x_cleaned,error_data_cleaned = [],[],[]
                 data_cleaned = N.append(data_cleaned, -(clip_back_correct[mask_l_new]))
-                if white_light == None:
-                    data_cleaned = N.append(data_cleaned, -(sig_new_correct)+cross_talk_correction[i])
-                else:
-                    data_cleaned = N.append(data_cleaned, -(sig_new_correct)+cross_talk_correction[i]-white_light[i])
-                    print 1-(N.mean(-(sig_new_correct)+cross_talk_correction[i]-white_light[i])/ N.mean(-(sig_new_correct)+cross_talk_correction[i]))
+                error_data_cleaned = N.append(error_data_cleaned, error_data_back[mask_l_new])
+                data_cleaned = N.append(data_cleaned, -(sig_new_correct)+cross_talk_correction[i])
+                error_data_cleaned = N.append(error_data_cleaned, error_data_sig)
                 data_cleaned = N.append(data_cleaned, -(clip_back_correct[mask_r_new]))
+                error_data_cleaned = N.append(error_data_cleaned, error_data_back[mask_r_new])
                 x_cleaned = N.append(x_cleaned, x_b_correct[mask_l_new])
                 x_cleaned = N.append(x_cleaned, x_new_correct)
                 x_cleaned = N.append(x_cleaned, x_b_correct[mask_r_new])
-                # The next two lines will be useful for daytime light leaks removal
-                #self.clip_back = N.append(self.clip_back,reclip_back)
-                #self.x_back    = N.append(self.x_back, x_b[-flagout_b])
-                # we can compute the average background level
-                #clip_back_mean = N.mean(reclip_back)
-                #self.x_data_clipped    = N.append(self.x_data_clipped,(-self.time_start[i]+self.time_stop[i])/2. + self.time_start[i])
+                
                 # we compute a first estimate of the exposure time of the single wavelength counting how many data are in the signal
-                # we use this value to compute the half width of the top hat (w) and its center (xe) 
+                
                 self.sub_exp = N.append(self.sub_exp,  x_new_correct[-1] -  x_new_correct[0])
-                #raw_mean_clip_correct,err_mean_clip_corr = self.weighted_avg_and_stderr(sig_new_correct[3:-2],1/err_sig_corr[3:-2])
+                
                 raw_mean_clip_correct = N.mean(sig_new_correct[3:-2])
                 err_mean_clip_corr = N.var(sig_new_correct[3:-2])/len(sig_new_correct[3:-2])
-                # the amplitude of the signal (parameter a in the fit)
+                # the amplitude of the signal 
                 self.data_clipped = N.append(self.data_clipped,-raw_mean_clip_correct+cross_talk_correction[i])
                 self.x_data_clipped = N.append(self.x_data_clipped,(x_new_correct[-1] -  x_new_correct[0])/2. + x_new_correct[0]+self.time_start[i])
                 #print i, self.data_clipped
                 #-- Error clipped --#(
-                data_error         = N.sqrt(err_mean_clip_corr+err_back_corrected)
+                data_error         = N.sqrt(err_mean_clip_corr+err_back_Corr)
                 data_error_tot     = N.append(data_error_tot, data_error)
-                #print self.data_clipped[i], data_error, data_error/self.data_clipped[i]
-                # We now compute the integral of the data in two ways: integral will be computed by integrating the
-                # fit function of the data, and other_integral will be the simple simpsons integration of the clap
-                # data directly with corresponding error propagation
-                integral_result = self.data_integral(x_array,data_new_corrected,self.data_clipped[i],self.sub_exp[i],x_new_correct[0],mean_back)
-                integral_result_other = integrate.simps(data_cleaned,x_cleaned,even='first')
-                error_other_integral = (((x_cleaned[-1]-x_cleaned[0])/len(x_cleaned))**2)*(2+4*len(x_cleaned[2:-2:2])+16*len(x_cleaned[1:-1:2]))*err_back_corrected/9.
-                # the integral of the total amount of light produced by SCALA
-                other_integral = N.array((integral_result_other,error_other_integral))
-                self.light = N.vstack((self.light, integral_result))
-                self.other_light = N.vstack((self.other_light,other_integral))
-                self.mask_list.append(mask)
-                #print self.light[i+1][0],self.other_light[i],error_other_integral,len(x_cleaned)
                 
-        #print N.shape(self.other_light)
-
+                # We now compute the integral of the data: integral will be the simple simpsons integration of the clap
+                # data directly with corresponding error propagation
+                integral_result = integrate.simps(data_cleaned,x_cleaned,even='first')
+                error_integral =(((x_cleaned[-1]-x_cleaned[0])/len(x_cleaned))**2)*(error_data_cleaned[0]+error_data_cleaned[-1]+4*N.sum(error_data_cleaned[2:-2:2])+16*N.sum(error_data_cleaned[1:-1:2]))/9.
+                # the integral of the total amount of light produced by SCALA
+                integral = N.array((integral_result,error_integral))
+                self.light = N.vstack((self.light,integral))
+                self.mask_list.append(mask)
+        
         self.light = N.delete(self.light,0,0)
-        self.other_light = N.delete(self.other_light,0,0)
         self.mask_list.remove(1.)
         if no_out:
            """return nothing"""
@@ -422,7 +368,7 @@ class Clap1_Data(Clap):
             
             return self.data_clipped, data_error_tot
         else:
-            return self.data_clipped, self.x_data_clipped,self.light, self.mask_list, self.clip_back,self.x_back,self.other_light
+            return self.data_clipped, self.x_data_clipped,0., self.mask_list, self.clip_back,self.x_back,self.light
      
 
 class Clap0_Data(Clap):
@@ -454,8 +400,8 @@ class Clap0_Data(Clap):
 
         """
 
-        self.light = [0.,0.]
         self.sub_exp,self.data_clipped, self.clip_back,self.x_back,data_error_tot = [],[],[],[],[]
+        self.light = [0.,0.]
         #-- Data clipped --#
         # Loop over the different wavelengths in a file
         # analysing every single block of back-signal-back data
@@ -473,7 +419,7 @@ class Clap0_Data(Clap):
             self.x_back    = N.append(self.x_back, N.append(x_b[mask_l],x_b[mask_r]))
             # lets apply the linear fit to remove the background
             data_new_corrected, err_back_corrected = self.remove_back(clip_back,x_b,mask_l,mask_r,data_new,x_array)
-            x_new_correct, sig_new_correct, x_b_correct, clip_back_correct = self.separate_sig_back(data_new_corrected,x_array,i,mask_data=mask[i])
+            x_new_correct, sig_new_correct, x_b_correct, clip_back_correct,error_data_sig,error_data_back = self.separate_sig_back(data_new_corrected,x_array,i,mask_data=mask[i],error_data=err_back_corrected)
             mask_l_new, mask_r_new = self.compute_background(clip_back_correct,x_b_correct,x_new_correct[0],x_new_correct[-1])
             back_corrected = N.append(clip_back_correct[mask_l_new][:-9],clip_back_correct[mask_r_new][10:])
             mean_back = N.mean(back_corrected)
@@ -489,10 +435,25 @@ class Clap0_Data(Clap):
             data_error         = N.sqrt(err_mean_clip_corr+err_back_corrected)
             data_error_tot     = N.append(data_error_tot, data_error)
 
-            integral_result = self.data_integral(x_array,data_new_corrected,self.data_clipped[i],self.sub_exp[i],x_new_correct[0],mean_back)
+            # lets compose the cleaned data set so that we can integrate all data with simpsons without any cosmics
+            data_cleaned, x_cleaned,error_data_cleaned = [],[],[]
+            data_cleaned = N.append(data_cleaned, -(clip_back_correct[mask_l_new]))
+            #if white_light == None:
+            data_cleaned = N.append(data_cleaned, -(sig_new_correct))
+            data_cleaned = N.append(data_cleaned, -(clip_back_correct[mask_r_new]))
+            error_data_cleaned = N.append(error_data_cleaned, error_data_back[mask_l_new])
+            error_data_cleaned = N.append(error_data_cleaned, error_data_sig)
+            error_data_cleaned = N.append(error_data_cleaned, error_data_back[mask_r_new])
+            x_cleaned = N.append(x_cleaned, x_b_correct[mask_l_new])
+            x_cleaned = N.append(x_cleaned, x_new_correct)
+            x_cleaned = N.append(x_cleaned, x_b_correct[mask_r_new])
             # the integral of the total amount of light produced by SCALA
-            self.light = N.vstack((self.light, integral_result))
-            
+            integral_result = integrate.simps(data_cleaned,x_cleaned,even='first')
+            error_integral =(((x_cleaned[-1]-x_cleaned[0])/len(x_cleaned))**2)*(error_data_cleaned[0]+error_data_cleaned[-1]+4*N.sum(error_data_cleaned[2:-2:2])+16*N.sum(error_data_cleaned[1:-1:2]))/9.
+            # the integral of the total amount of light produced by SCALA
+            integral = N.array((integral_result,error_integral))
+            self.light = N.vstack((self.light,integral))
+
         self.light = N.delete(self.light,0,0)
         if no_snifs:
             return self.data_clipped, data_error_tot

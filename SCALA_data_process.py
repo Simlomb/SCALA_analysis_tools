@@ -5,7 +5,7 @@
 
 import numpy              as N
 import pyfits             as F
-import calib_library as I
+import calib_library1 as I
 from scipy import integrate
 
 from os import listdir
@@ -16,7 +16,7 @@ from scipy import interpolate
 import os
 
 DATAPATH = os.path.realpath(__file__).split('SCALA_data_process.py')[0]+'refdata/'
-
+#DATAPATH = '/Users/simonalombardo/new_SCALA_analysis/test_SCALA/159_wave_cal/uncut_data/refdata/'
 
 class SnifsData:
     """
@@ -76,7 +76,7 @@ class SCALA_Calib:
         self.cross_talk0 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,1], kind='linear') #light measurement from clap0
         self.cross_talk1 = interpolate.interp1d(cross_talk1[:,0], cross_talk1[:,3], kind='linear') # cross talk measurement from clap1
         self.Inter1, self.var_Inter1 = self.interpolate_arm_curve(4)
-        self.clap_data, self.integrated_clap, self.integrated_clap2 = [],[],[]
+        self.clap_data, self.integrated_clap, self.data_clap_clipped = [],[],[]
         if list_SCALA != []:
             self.list_SCALA = sorted(list_SCALA)
             self.scala_B_channel, self.scala_R_channel =[],[]
@@ -100,11 +100,10 @@ class SCALA_Calib:
                 self.clap_data.append(Cdp.Clap1_Data(self._clap_files[i]))
                 self.clap_data[i].sig_back(N.zeros((len(self.clap_data[i].lbda))),no_out=True)
                 self.clap_data[i].light[N.isnan(self.clap_data[i].light)] = 0.
-                self.clap_data[i].other_light[N.isnan(self.clap_data[i].other_light)] = 0.
                 if self.clap_data[i].light[0,0] == 0.:
                     print " This file: %s will be skipped because of shutter failure" %self._clap_files[i]
                     self.integrated_clap.append(self.clap_data[i].light)
-                    self.integrated_clap2.append(self.clap_data[i].other_light)
+                    self.data_clap_clipped.append(self.clap_data[i].data_clipped)
                 else:
                     print "Applying cross talk correction to file %s" %self._clap_files[i]
                     clap0_class = Cdp.Clap0_Data(self.clap_files0[i])
@@ -112,12 +111,12 @@ class SCALA_Calib:
                     cross_talk_correction = self.cross_talk1(self.clap_data[i].lbda)*(-clap0_light_level[0])/self.cross_talk0(self.clap_data[i].lbda)
                     self.clap_data[i].sig_back(cross_talk_correction,no_out=True)
                     self.integrated_clap.append(self.clap_data[i].light)
-                    self.integrated_clap2.append(self.clap_data[i].other_light)
+                    self.data_clap_clipped.append(self.clap_data[i].data_clipped)
         #print N.shape(self.integrated_clap),  N.shape(self.integrated_clap2)
         
         print "Clap data fitting performed. Now I compute the throughput for each spaxel"
-        self.A18         = I.Simulate(None).interpolate_mirror
-        self.clap1_simul = I.Simulate(1).interpolate_array
+        self.A18         = I.Simulate(None).A18_calib()
+        self.clap1_simul  = I.Simulate(1).Iterate_interp()
 
 
     
@@ -212,9 +211,10 @@ class SCALA_Calib:
                 start,end,index_snifs = self.select_condition_for_line_analysis(channel,i,len(self.Clap.lbda),index,delta,linewidth,integrated_data)
                 lbda_cent_mean = self.lbda_mean_snifs(index_snifs, integrated_data)
                 self.lbdacent_snifs = N.append(self.lbdacent_snifs, lbda_cent_mean)
-                self.max_snifs = N.append(self.max_snifs, integrated_data[index_snifs]/225.)
+                self.max_snifs = N.append(self.max_snifs, integrated_data[index_snifs])
                 mask_tmp = (self.snifs_data.lbda>=self.snifs_data.lbda[start])*(self.snifs_data.lbda<self.snifs_data.lbda[end+1])
                 mask.append(mask_tmp)
+                
                 extra_mask = int(100/self.snifs_data.L_step)
                 first_bkg = index_snifs-delta[0]
                 second_bkg = index_snifs+delta[1]
@@ -240,9 +240,9 @@ class SCALA_Calib:
                 #we want to remove part of the high cross talk contribution
                 #so we can reduce the bias on the background
                 mean_bkg = N.append(mean_bkg,N.mean(background))
-                var_bkg = N.append(var_bkg,N.var(background))
+                var_bkg = N.append(var_bkg,N.var(background)/len(background)**2)
                 #print i,first_bkg, bkg_step1,second_bkg,bkg_step2
-
+                
         if N.any(self.full_line):
             return  mean_bkg,N.array(mask),var_bkg
         else:
@@ -259,14 +259,21 @@ class SCALA_Calib:
         lbda_cent_mean = N.sum(lbd_array*clean_data)/N.sum(clean_data) 
         return lbda_cent_mean
 
-    def datacube_to_spectrum(self,datacube):
+    def datacube_to_spectrum(self,datacube, var=False):
         """
         Collapse a datacube into a spectrum
         """
         datacube[N.isnan(datacube)] = 0.
-        spectrum = N.sum(datacube, axis=1)
-        spectrum = N.sum(spectrum, axis=1)
-        return spectrum
+        new_cube = []
+        for i in range(15):
+            for j in range(15):
+                new_cube.append(datacube[:,i,j]) 
+
+        spectrum = N.array(new_cube)
+        if var:
+            return N.var(spectrum,axis=0)/225.
+        else:
+            return N.mean(spectrum,axis=0)
     
     def _background_(self,snifs_data, file_number, channel, cube=True):
         """
@@ -306,7 +313,7 @@ class SCALA_Calib:
                 start,end,index_snifs = self.select_condition_for_line_analysis(channel,i,len(self.Clap.lbda),index,delta,linewidth,integrated_data)
                 lbda_cent_mean = self.lbda_mean_snifs(index_snifs, integrated_data)
                 self.lbdacent_snifs = N.append(self.lbdacent_snifs, lbda_cent_mean)
-                self.max_snifs = N.append(self.max_snifs, integrated_data[index_snifs]/225.)
+                self.max_snifs = N.append(self.max_snifs, integrated_data[index_snifs])
                 #self.lbdacent_snifs = N.append(self.lbdacent_snifs, self.snifs_data.lbda[index_snifs])
                 #if channel == 'R' and i == (len(self.Clap.lbda)-3):
                 #    mask_tmp = (self.snifs_data.lbda>=self.snifs_data.lbda[start])
@@ -319,7 +326,7 @@ class SCALA_Calib:
                 if (self.snifs_data.lbda[start]-61.) <= self.snifs_data.lbda[0]:
                     mask_tmp1 = (self.snifs_data.lbda<self.snifs_data.lbda[end+1+extra_mask])
                     mask_back = N.ma.mask_or(mask_back,mask_tmp1)
-                elif (self.snifs_data.lbda[end+1]+61.) >= self.snifs_data.lbda[-1]:
+                elif (self.snifs_data.lbda[end]+100) >= self.snifs_data.lbda[-1]:
                     mask_tmp1 = (self.snifs_data.lbda>=self.snifs_data.lbda[start-extra_mask])
                     mask_back = N.ma.mask_or(mask_back,mask_tmp1)
                 else:
@@ -361,7 +368,7 @@ class SCALA_Calib:
             clean_background = self.Clean_array(back_ground_mask)
             mean_bkg = N.median(clean_background*1)
             #print len(clean_background), mean_bkg
-            return mean_bkg,N.array(mask),N.var(clean_background), back_ground_mask,lbd_masked
+            return mean_bkg,N.array(mask),N.var(clean_background)/len(clean_background)#, back_ground_mask,lbd_masked
         else:
             """ return nothing """
             return 0.,0.,0.
@@ -404,8 +411,9 @@ class SCALA_Calib:
         """
         lbd_weight = N.linspace(0.,99.940, 1001)
         lbd_line = N.linspace(lbd_weight[0]-lbd_weight[len(lbd_weight)/2],lbd_weight[-1]-lbd_weight[len(lbd_weight)/2],len(lbd_weight))+lbda_cent
-        clap1_int = N.mean([d(lbd_line) for d in self.clap1_simul], axis=0)
-        err_clap1_int = N.var([d(lbd_line) for d in self.clap1_simul], axis=0)
+        clap1_int = self.clap1_simul[1](lbd_line)
+        #err_clap1_int = N.abs(self.clap1_simul[0](lbd_line) - clap1_int)**2 + (self.clap1_simul[2](lbd_line))**2 full interpolation error
+        err_clap1_int = (self.clap1_simul[2](lbd_line))**2
         integ_weight = integrate.simps(self.Inter1*clap1_int, lbd_line)
         sqr_Inter1 = self.Inter1**4
         sqr_clap1 = clap1_int**2
@@ -450,7 +458,10 @@ class SCALA_Calib:
         """
        
         if line == 0:
-            if channel == 'B' and len_Cl_data > 5 :
+            if len(self.Clap.lbda) == 1:
+                delta1 = (self.Clap.lbda[line]-self.snifs_data.lbda[2])/(2*self.snifs_data.L_step)
+                delta2 = 500./(2*self.snifs_data.L_step)
+            elif channel == 'B' and len_Cl_data > 5 :
                 delta1 = (self.Clap.lbda[line+1]-self.Clap.lbda[line])/(2*self.snifs_data.L_step)
                 delta2 = (self.snifs_data.lbda[-3]-self.Clap.lbda[line])/(2*self.snifs_data.L_step)
             else:
@@ -524,16 +535,19 @@ class SCALA_Calib:
         """
         if self.analys_type == 't':
             energy = self.photon_energy(lbda)
-            line_profile = N.asarray(obs_line)*energy
+            dl = lbda[1]-lbda[0]
+            line_profile = N.asarray(obs_line*dl)
+            #int_profile = integrate.simps(line_profile,lbda) old way
+            int_profile = N.sum(line_profile*energy)
+            snifs_err = N.sum(line_profile*energy**2)
+            #variance_t = variance*energy**2  old way
+            #snifs_err = ((self.snifs_data.L_step**2)*((variance_t[0])+4*N.sum(variance_t[2:-2:2])+16*N.sum(variance_t[1:-1:2])+(variance_t[-1]))/9.)/len(variance_t)**2
         else:
             #line_profile =  N.asarray(obs_line)
             line_profile = N.asarray(obs_line)
-        int_profile = integrate.simps(line_profile,lbda)
-        if self.analys_type == 't':
-            sqrt_energy = energy**2
-            snifs_err = (self.snifs_data.L_step**2)*((variance[0]*sqrt_energy[0])+4*N.sum(variance[2:-2:2]*sqrt_energy[2:-2:2])+16*N.sum(variance[1:-1:2]*sqrt_energy[1:-1:2])+(variance[-1]*sqrt_energy[-1]))/9.
-        else:
-            snifs_err   = (self.snifs_data.L_step*self.snifs_data.L_step)*(variance[0]+4*N.sum(variance[2:-2:2])+16*N.sum(variance[1:-1:2])+(variance[-1]))/9.
+            int_profile = integrate.simps(line_profile,lbda)
+            snifs_err   = ((self.snifs_data.L_step*self.snifs_data.L_step)*(variance[0]+4*N.sum(variance[2:-2:2])+16*N.sum(variance[1:-1:2])+(variance[-1]))/9.)/len(variance)**2
+                
         return int_profile, snifs_err
     
     def photon_energy(self, lbda):
@@ -583,15 +597,15 @@ class SCALA_Calib:
         S=A_pd*sa_SCALA/(A_SCALA*sa_spaxel) # 93549.95727539062
         diameters=(221.8, 66.0)
         """
-        A18_value = N.mean([f(lbda_cent) for f in self.A18]) #Check the A18 value scaling factor!!!!
-        var_A18 = N.var([f(lbda_cent) for f in self.A18])
+        A18_value = self.A18[0](lbda_cent) #Check the A18 value scaling factor!!!!
+        var_A18 = (self.A18[1](lbda_cent))**2 
         if self.analys_type == 't':
-            geom_fact_var = (93549.95727539062**2/A18_value**4)*var_A18
-            return 93549.95727539062/A18_value,geom_fact_var,A18_value,var_A18
+            #geom_fact_var = (93549.95727539062**2/A18_value**4)*var_A18
+            return 93549.95727539062,A18_value,var_A18
         else:
             # factor*(222**2 - 66**2)*pi/4*10**(-7)= 330.103828289671
-            geom_fact_var = (330.103828289671**2/A18_value**4)*var_A18
-            return 330.103828289671/A18_value,geom_fact_var,A18_value,var_A18
+            #geom_fact_var = (330.103828289671**2/A18_value**4)*var_A18
+            return 330.103828289671,A18_value,var_A18
 
     
     def analysis_result(self,snifs_light,clap_light,geom_factor):
@@ -615,18 +629,17 @@ class SCALA_Calib:
         
         snifs, snifs_err = snifs_light
         clap, clap_var = clap_light
-        factor, factor_var = geom_factor
         #print snifs, clap, factor,self.snifs_data.exptime
         if self.analys_type == 't':
-            Calib_value = snifs*factor/clap
+            Calib_value = snifs*geom_factor/(clap)
             #print snifs_light, clap_light
             #Tot_error   = N.sqrt(Clap_error +integ_clap_err+A18_error+snifs_err)*Calib_value
             ###Compute the error!!!!!
-            Tot_error = (snifs_err/(snifs)**2+factor_var/(factor)**2+clap_var/(clap)**2)*Calib_value**2
+            Tot_error = (snifs_err/(snifs)**2+clap_var/(clap)**2)*(Calib_value**2)
             #print snifs_err/(snifs)**2,factor_var/(factor)**2,clap_var/(clap)**2, N.sqrt(Tot_error)/Calib_value
         else:
-            Calib_value = snifs*factor*self.snifs_data.exptime/clap
-            Tot_error = (snifs_err/(snifs)**2+factor_var/(factor)**2+clap_var/(clap)**2+(0.1/self.snifs_data.exptime)**2)*Calib_value**2
+            Calib_value = snifs*geom_factor*self.snifs_data.exptime/clap
+            Tot_error = (snifs_err/(snifs)**2+clap_var/(clap)**2+(0.1/self.snifs_data.exptime)**2)*(Calib_value**2)
         #print Calib_value
         return Calib_value, Tot_error
 
@@ -656,8 +669,8 @@ class SCALA_Calib:
         Full_line = lbd_width/2.
         #lbda_start_full = new_lbda[self.find_nearest(snifs_line_func(new_lbda[:len(new_lbda)/2]),Full_line)]
         #lbda_stop_full = new_lbda[len(new_lbda)/2:][self.find_nearest(snifs_line_func(new_lbda[len(new_lbda)/2:]),Full_line)]
-        #lbd_fwhm = N.linspace(lbda_start-Full_line, lbda_stop+Full_line,1000)
-        lbd_fwhm = N.linspace(lbda_start, lbda_stop,500)
+        lbd_fwhm = N.linspace(lbda_start-Full_line, lbda_stop+Full_line,1000)
+        #lbd_fwhm = N.linspace(lbda_start, lbda_stop,500)
         snifs_line_fwhm = snifs_line_func(lbd_fwhm)
         var_line_func = interpolate.interp1d(lbda,variance, kind='linear', bounds_error=False, fill_value=0.)
         var_line_fwhm = var_line_func(lbd_fwhm)
@@ -675,13 +688,21 @@ class Cube_analysis(SCALA_Calib):
         INPUT :
                channel    : SNIFS channel
                file_number: index of file used for analysis
+               snifs_fwhm : Boolean, if you want to have a FWHM
+                            line integration on SNIFS lines set it to True
+               back_old:    way of computing the background between
+                            SNIFS lines.
+                            The back_old compute the background in the immediate
+                            vicinity of the line (left and right of it) and subtruct
+                            it. The new way does it cutting off all the SCALA lines in a spaxel
+                            and computing an average on the leftovers.
                
         """
         if channel == 'B':
             self.snifs_data = self.snifs_data_B[file_number]
         else:
             self.snifs_data = self.snifs_data_R[file_number]
-        self.lbdacent_snifs, Calibration, Calibration2, self.full_line,error_Cal,error_Cal2 = [],[],[],[],[],[]
+        self.lbdacent_snifs, self.max_snifs,Calibration, self.full_line,error_Cal = [],[],[],[],[]
         snifs_int,err_snifs_int,tot_clap_light,err_tot_clap_light,int_clap_try,err_int_clap_try = [],[],[],[],[],[]
         if back_old:
             mean_bkg,mask,var_bkg = self._backgroundold_(self.snifs_data.data[:,spxx,spxy],channel,cube=True)
@@ -694,8 +715,6 @@ class Cube_analysis(SCALA_Calib):
             if self.full_line[line] == False:
                 Calibration = N.append(Calibration,0.)
                 error_Cal = N.append(error_Cal,0.)
-                Calibration2 = N.append(Calibration2,0.)
-                error_Cal2 = N.append(error_Cal2,0.)
                 # for test purpose
                 snifs_int = N.append(snifs_int,0.)
                 err_snifs_int = N.append(err_snifs_int,0.)
@@ -708,73 +727,73 @@ class Cube_analysis(SCALA_Calib):
                 variance_Snifs = self.snifs_data.variance[mask[line], spxx, spxy] # variance corresponding to the snifs line
                 variance_Snifs[N.isnan(variance_Snifs)] = 0.
                 if back_old:
-                    line_bkg_sub = self.snifs_data.data[mask[line], spxx, spxy] - mean_bkg[line]
-                    var_snifs = variance_Snifs+var_bkg[line]
+                    line_bkg_sub = (self.snifs_data.data[mask[line], spxx, spxy])/self.snifs_data.L_step# - mean_bkg[line]
+                    var_snifs = (variance_Snifs)/self.snifs_data.L_step**2#+var_bkg[line]
                 else:
-                    line_bkg_sub = (self.snifs_data.data[mask[line], spxx, spxy]) - mean_bkg
-                    var_snifs = variance_Snifs+var_bkg
+                    line_bkg_sub = ((self.snifs_data.data[mask[line], spxx, spxy]) - mean_bkg)/self.snifs_data.L_step
+                    var_snifs = (variance_Snifs+var_bkg)/self.snifs_data.L_step**2
                 line_bkg_sub[N.isnan(line_bkg_sub)] = 0.
                 weight_func,weight_func_err = self.weight_CLAP_Data(self.lbdacent_snifs[line])
-                # clap_light is the light measure by clap computed integrating the fit function to the data,
-                # clap_light2 is the light measured by clap computed the data directly with simpsons method
-                clap_light  = self.integrated_clap[file_number][line][0]*weight_func
+                # clap_light is the light measured by clap computed the data directly with simpsons method
+                clap_light = self.integrated_clap[file_number][line][0]*weight_func
                 var_Clap_light = (self.integrated_clap[file_number][line][1]*weight_func**2)+(weight_func_err*self.integrated_clap[file_number][line][0]**2)
-                clap_light2 = self.integrated_clap2[file_number][line][0]*weight_func
-                var_Clap_light2 = (self.integrated_clap2[file_number][line][1]*weight_func**2)+(weight_func_err*self.integrated_clap2[file_number][line][0]**2)
-                int_clap_try = N.append(int_clap_try,self.integrated_clap2[file_number][line][0])
-                err_int_clap_try = N.append(err_int_clap_try,self.integrated_clap2[file_number][line][1])
+                int_clap_try = N.append(int_clap_try,self.integrated_clap[file_number][line][0])
+                err_int_clap_try = N.append(err_int_clap_try,self.integrated_clap[file_number][line][1])
                 if clap_light == 0.:
                     Calibration = N.append(Calibration,0.)
                     error_Cal = N.append(error_Cal,0.)
-                    Calibration2 = N.append(Calibration2,0.)
-                    error_Cal2 = N.append(error_Cal2,0.)
                     #for test purpose
                     snifs_int = N.append(snifs_int,0.)
                     err_snifs_int = N.append(err_snifs_int,0.)
                     tot_clap_light = N.append(tot_clap_light, 0.)
                     err_tot_clap_light = N.append(err_tot_clap_light,0.)
                 else:
-                    geom_factor,geom_factor_var,A18,var_A18 = self.convert_factor(self.lbdacent_snifs[line])
-                    tot_clap_light = N.append(tot_clap_light, clap_light2*A18)
-                    err_tot_clap_light = N.append(err_tot_clap_light,var_Clap_light2*A18 + var_A18*clap_light2)
+                    geom_factor,A18,var_A18 = self.convert_factor(self.lbdacent_snifs[line])
+                    #tot_clap_light = N.append(tot_clap_light, A18)
+                    #err_tot_clap_light = N.append(err_tot_clap_light,var_A18)
+                    tot_clap_light = N.append(tot_clap_light, clap_light*A18)
+                    err_tot_clap_light = N.append(err_tot_clap_light,var_Clap_light*A18**2 + var_A18*clap_light**2)
                     if snifs_fwhm:
                         lbd_fwhm,snifs_line_fwhm,var_line_fwhm = self.select_snifs_FWHM(line_bkg_sub,self.snifs_data.lbda[mask[line]], var_snifs)
                         snifs_light,err_snifs = self.integ_snifs_line(snifs_line_fwhm,lbd_fwhm, var_line_fwhm)
                     else:
                         snifs_light,err_snifs = self.integ_snifs_line(line_bkg_sub,self.snifs_data.lbda[mask[line]], var_snifs)
-                    cal, err_cal = self.analysis_result((snifs_light,err_snifs),(clap_light,var_Clap_light),(geom_factor,geom_factor_var))
-                    cal2, err_cal2 = self.analysis_result((snifs_light,err_snifs),(clap_light2,var_Clap_light2),(geom_factor,geom_factor_var))
+                    cal, err_cal = self.analysis_result((snifs_light,err_snifs),(tot_clap_light[line],err_tot_clap_light[line]),geom_factor)
                     Calibration = N.append(Calibration,cal)
                     error_Cal = N.append(error_Cal,err_cal)
-                    Calibration2 = N.append(Calibration2,cal2)
-                    error_Cal2 = N.append(error_Cal2,err_cal2)
                     snifs_int = N.append(snifs_int,snifs_light)
                     err_snifs_int = N.append(err_snifs_int,err_snifs)
-                    #if spxx == 7 and spxy == 7: 
-                    #    print N.sqrt(err_snifs)/snifs_light,N.sqrt(var_Clap_light2)/clap_light2,N.sqrt(geom_factor_var)/geom_factor
-                    #    print N.sqrt(err_cal2)/cal2,cal2
         
-        return Calibration,error_Cal,Calibration2,error_Cal2,snifs_int,err_snifs_int,int_clap_try,err_int_clap_try,tot_clap_light,err_tot_clap_light,snifs_time
+        return Calibration,error_Cal,snifs_int,err_snifs_int,int_clap_try,err_int_clap_try,tot_clap_light,err_tot_clap_light,snifs_time
+
 
 class Spectrum_analysis(SCALA_Calib):
     """
     This class is a child of SCALA_Calib
     and it is meant to run the analysis on
     spectra from collapsed datacubes of SCALA
+
+    INPUT :
+               channel    : SNIFS channel
+               file_number: index of file used for analysis
     """
 
     def channel_analysis(self, file_number, channel):
         """
-        your stuff
+        INPUT :
+               channel    : SNIFS channel
+               file_number: index of file used for analysis
+        It uses directly the FWHNM function and the back_old subtraction
+        as expleined in the Cube analysis 
         """
         #print channel
         if channel == 'B':
             self.snifs_data = self.snifs_data_B[file_number]
         else:
             self.snifs_data = self.snifs_data_R[file_number]
-        integrated_data = self.datacube_to_spectrum(self.snifs_data.data)  
-        variance_Snifs = self.datacube_to_spectrum(self.snifs_data.variance) # variance corresponding to the snifs 
-        self.lbdacent_snifs,self.max_snifs, Calibration, Calibration2, self.full_line,error_Cal,error_Cal2 = [],[],[],[],[],[],[]
+        integrated_data = self.datacube_to_spectrum(self.snifs_data.data)
+        variance_Snifs = self.datacube_to_spectrum(self.snifs_data.variance,var=True) # variance corresponding to the snifs 
+        self.lbdacent_snifs,self.max_snifs, Calibration, self.full_line,error_Cal = [],[],[],[],[]
         snifs_int,err_snifs_int,tot_clap_light,err_tot_clap_light,int_clap_try,err_int_clap_try = [],[],[],[],[],[]
         mean_bkg,mask,var_bkg= self._backgroundold_(integrated_data,channel,cube=False)
         snifs_time = N.ones((len(self.Clap.lbda)))*self.snifs_data.exptime
@@ -786,8 +805,6 @@ class Spectrum_analysis(SCALA_Calib):
             if self.full_line[line] == False:
                 Calibration = N.append(Calibration,0.)
                 error_Cal = N.append(error_Cal,0.)
-                Calibration2 = N.append(Calibration2,0.)
-                error_Cal2 = N.append(error_Cal2,0.)
                 # for test purpose
                 snifs_int = N.append(snifs_int,0.)
                 err_snifs_int = N.append(err_snifs_int,0.)
@@ -805,39 +822,31 @@ class Spectrum_analysis(SCALA_Calib):
                 var_snifs = variance_Snifs_line+var_bkg[line]
                 #print N.shape(var_snifs)
                 weight_func,weight_func_err = self.weight_CLAP_Data(self.lbdacent_snifs[line])
-                # clap_light is the light measure by clap computed integrating the fit function to the data,
-                # clap_light2 is the light measured by clap computed the data directly with simpsons method
-                clap_light  = self.integrated_clap[file_number][line][0]*weight_func
+                # clap_light is the light measured by clap computed the data directly with simpsons method
+                clap_light = self.integrated_clap[file_number][line][0]*weight_func
                 var_Clap_light = (self.integrated_clap[file_number][line][1]*weight_func**2)+(weight_func_err*self.integrated_clap[file_number][line][0]**2)
-                clap_light2 = self.integrated_clap2[file_number][line][0]*weight_func
-                var_Clap_light2 = (self.integrated_clap2[file_number][line][1]*weight_func**2)+(weight_func_err*self.integrated_clap2[file_number][line][0]**2)
-                int_clap_try = N.append(int_clap_try,self.integrated_clap2[file_number][line][0])
-                err_int_clap_try = N.append(err_int_clap_try,self.integrated_clap2[file_number][line][1])
+                int_clap_try = N.append(int_clap_try,self.integrated_clap[file_number][line][0])
+                err_int_clap_try = N.append(err_int_clap_try,self.integrated_clap[file_number][line][1])
                 if clap_light == 0.:
                     Calibration = N.append(Calibration,0.)
                     error_Cal = N.append(error_Cal,0.)
-                    Calibration2 = N.append(Calibration2,0.)
-                    error_Cal2 = N.append(error_Cal2,0.)
                     #for test purpose
                     snifs_int = N.append(snifs_int,0.)
                     err_snifs_int = N.append(err_snifs_int,0.)
                     tot_clap_light = N.append(tot_clap_light, 0.)
                     err_tot_clap_light = N.append(err_tot_clap_light,0.)
                 else:
-                    geom_factor,geom_factor_var,A18,var_A18 = self.convert_factor(self.lbdacent_snifs[line])
-                    tot_clap_light = N.append(tot_clap_light, clap_light2*A18)
-                    err_tot_clap_light = N.append(err_tot_clap_light,var_Clap_light2*A18 + var_A18*clap_light2)
+                    geom_factor,A18,var_A18 = self.convert_factor(self.lbdacent_snifs[line])
+                    tot_clap_light = N.append(tot_clap_light, clap_light*A18)
+                    err_tot_clap_light = N.append(err_tot_clap_light,var_Clap_light*A18 + var_A18*clap_light)
                     #print N.shape(self.snifs_data.lbda[mask[line]])
                     lbd_fwhm,snifs_line_fwhm,var_line_fwhm = self.select_snifs_FWHM(line_bkg_sub,self.snifs_data.lbda[mask[line]], var_snifs)
                     snifs_light,err_snifs = self.integ_snifs_line(snifs_line_fwhm,lbd_fwhm, var_line_fwhm)
-                    cal, err_cal = self.analysis_result((snifs_light,err_snifs),(clap_light,var_Clap_light),(geom_factor,geom_factor_var))
-                    cal2, err_cal2 = self.analysis_result((snifs_light,err_snifs),(clap_light2,var_Clap_light2),(geom_factor,geom_factor_var))
+                    cal, err_cal = self.analysis_result((snifs_light,err_snifs),(tot_clap_light,err_tot_clap_light),geom_factor)
                     Calibration = N.append(Calibration,cal)
                     error_Cal = N.append(error_Cal,err_cal)
-                    Calibration2 = N.append(Calibration2,cal2)
-                    error_Cal2 = N.append(error_Cal2,err_cal2)
                     snifs_int = N.append(snifs_int,snifs_light)
                     err_snifs_int = N.append(err_snifs_int,err_snifs)
         
-        return Calibration,error_Cal,Calibration2,error_Cal2,snifs_int,err_snifs_int,int_clap_try,err_int_clap_try,tot_clap_light,err_tot_clap_light,snifs_time,max_snifs
+        return Calibration,error_Cal,snifs_int,err_snifs_int,int_clap_try,err_int_clap_try,tot_clap_light,err_tot_clap_light,snifs_time,max_snifs
             
